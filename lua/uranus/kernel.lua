@@ -70,9 +70,7 @@ end
 ---@return UranusResult<UranusKernelInfo[]>
 function M.discover_local_kernels()
   local backend = require("uranus.backend")
-  local result = backend.send_command("list_kernelspecs", {
-    paths = M.config.kernels.discovery_paths
-  })
+  local result = backend.send_command("list_kernels", {})
 
   if not result.success then
     return result
@@ -80,12 +78,11 @@ function M.discover_local_kernels()
 
   -- Transform Rust response to Lua kernel info format
   local kernels = {}
-  for _, spec in ipairs(result.data.kernelspecs or {}) do
+  for _, kernel in ipairs(result.data.kernels or {}) do
     table.insert(kernels, {
-      id = spec.name,
-      name = spec.name,
-      language = spec.language or "unknown",
-      spec = spec, -- Keep full spec for Rust backend
+      id = kernel.name,
+      name = kernel.name,
+      language = kernel.language or "unknown",
       status = "available",
       type = "local",
     })
@@ -113,21 +110,11 @@ function M.connect(kernel_name)
     return M.ok(M.current_kernel)
   end
 
-  -- Connect via backend
+  -- Connect via backend (start kernel)
   local backend = require("uranus.backend")
-  local result
-
-  if kernel.type == "local" then
-    result = backend.send_command("connect_kernel", {
-      kernelspec = kernel.spec,
-    })
-  else
-    -- Remote kernel connection
-    result = backend.send_command("connect_remote_kernel", {
-      server = kernel.server,
-      kernel_id = kernel.id,
-    })
-  end
+  local result = backend.send_command("start_kernel", {
+    kernel = kernel.name,
+  })
 
   if not result.success then
     return result
@@ -172,15 +159,10 @@ function M.execute(code, opts)
     return M.err("NO_KERNEL", "No kernel connected")
   end
 
-  -- Send execute_request to backend
+  -- Send execute to backend
   local backend = require("uranus.backend")
-  local result = backend.send_command("execute_request", {
+  local result = backend.send_command("execute", {
     code = code,
-    kernel_id = opts.kernel_id or M.current_kernel.id,
-    silent = opts.silent or false,
-    store_history = true,
-    user_expressions = {},
-    allow_stdin = false,
   })
 
   if not result.success then
@@ -197,7 +179,7 @@ end
 function M.start_kernel(kernel_name)
   local backend = require("uranus.backend")
   local result = backend.send_command("start_kernel", {
-    kernel_name = kernel_name,
+    kernel = kernel_name,
   })
 
   if not result.success then
@@ -218,19 +200,15 @@ end
 ---@param kernel_id string Kernel ID to stop
 ---@return UranusResult
 function M.stop_kernel(kernel_id)
-  local backend = require("uranus.backend")
-  local result = backend.send_command("shutdown_request", {
-    kernel_id = kernel_id,
-  })
-
-  if result.success then
-    M.active_kernels[kernel_id] = nil
-    if M.current_kernel and M.current_kernel.id == kernel_id then
-      M.current_kernel = nil
-    end
+  -- Note: The Rust backend doesn't support stopping individual kernels,
+  -- only shutting down the entire backend. For now, we'll just update local state.
+  M.active_kernels[kernel_id] = nil
+  if M.current_kernel and M.current_kernel.id == kernel_id then
+    M.current_kernel = nil
   end
 
-  return result
+  vim.notify("Kernel " .. kernel_id .. " stopped (local state only)", vim.log.levels.INFO)
+  return M.ok(true)
 end
 
 --- List all available kernels

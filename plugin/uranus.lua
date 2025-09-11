@@ -180,5 +180,52 @@ end, {
   nargs = "+",
 })
 
+vim.api.nvim_create_user_command("UranusListKernels", function()
+  M._lazy_init()
+  local uranus = require("uranus")
+  local kernel = require("uranus.kernel")
+
+  local result = kernel.discover_local_kernels()
+  if result.success then
+    local kernels = result.data
+    if #kernels == 0 then
+      vim.notify("No kernels found", vim.log.levels.WARN)
+      return
+    end
+
+    local lines = {"Available kernels:"}
+    for _, k in ipairs(kernels) do
+      table.insert(lines, string.format("  - %s (%s)", k.name, k.language))
+    end
+    vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+  else
+    vim.notify("Failed to list kernels: " .. result.error.message, vim.log.levels.ERROR)
+  end
+end, {
+  desc = "List available Jupyter kernels",
+})
+
+vim.api.nvim_create_user_command("UranusStartKernel", function(opts)
+  M._lazy_init()
+  local uranus = require("uranus")
+  local kernel_name = opts.args
+
+  if kernel_name == "" then
+    vim.notify("Usage: UranusStartKernel <kernel_name>", vim.log.levels.ERROR)
+    return
+  end
+
+  local kernel = require("uranus.kernel")
+  local result = kernel.start_kernel(kernel_name)
+  if result.success then
+    vim.notify("Started kernel: " .. kernel_name, vim.log.levels.INFO)
+  else
+    vim.notify("Failed to start kernel: " .. result.error.message, vim.log.levels.ERROR)
+  end
+end, {
+  desc = "Start a Jupyter kernel",
+  nargs = 1,
+})
+
 -- Export the module
 return M
