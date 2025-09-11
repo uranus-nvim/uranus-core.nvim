@@ -213,28 +213,27 @@ vim.api.nvim_create_user_command("UranusListKernels", function()
       vim.notify("Failed to start Uranus backend: " .. start_result.error.message, vim.log.levels.ERROR)
       return
     end
+  end
 
-    -- Give backend time to initialize and discover kernels
-    vim.defer_fn(function()
-      local result = kernel.discover_local_kernels()
-      if result.success then
-        local kernels = result.data
-        if #kernels == 0 then
-          vim.notify("No kernels found", vim.log.levels.WARN)
-          return
-        end
+  -- Backend is ready, discover kernels immediately
+  vim.notify("Discovering kernels...", vim.log.levels.INFO)
+  local result = kernel.discover_local_kernels()
+  if result.success then
+    local kernels = result.data
+    vim.notify("Found " .. #kernels .. " kernels", vim.log.levels.INFO)
+    if #kernels == 0 then
+      vim.notify("No kernels found", vim.log.levels.WARN)
+      return
+    end
 
-        local lines = {"Available kernels:"}
-        for _, k in ipairs(kernels) do
-          table.insert(lines, string.format("  - %s (%s)", k.name, k.language))
-        end
+    local lines = {"Available kernels:"}
+    for _, k in ipairs(kernels) do
+      table.insert(lines, string.format("  - %s (%s)", k.name, k.language))
+    end
 
-        vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
-      else
-        vim.notify("Failed to list kernels: " .. result.error.message, vim.log.levels.ERROR)
-      end
-    end, 1000) -- Wait 1 second for backend to initialize
-    return
+    vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+  else
+    vim.notify("Failed to list kernels: " .. result.error.message, vim.log.levels.ERROR)
   end
 
   -- Backend is already running, discover kernels immediately

@@ -56,6 +56,21 @@ function M.start()
     return M.err("BINARY_NOT_FOUND", "Uranus backend binary not found")
   end
 
+  -- For now, use synchronous communication with vim.system
+  -- This is simpler and more reliable for initial testing
+  M.state.binary_path = binary_path
+  M.state.connected = true
+
+  vim.notify("Uranus backend ready (synchronous mode)", vim.log.levels.INFO)
+  return M.ok(true)
+end
+
+  -- Find the backend binary
+  local binary_path = M._find_binary()
+  if not binary_path then
+    return M.err("BINARY_NOT_FOUND", "Uranus backend binary not found")
+  end
+
   -- Start the process with libuv
   local uv = vim.loop
   local stdin = uv.new_pipe(false)
@@ -84,54 +99,21 @@ function M.start()
   }
   M.state.connected = true
 
-  -- Set up stdout reader
-  uv.read_start(stdout, function(err, data)
-    if err then
-      vim.notify("Error reading from backend: " .. err, vim.log.levels.ERROR)
-      return
-    end
-    if data then
-      M._handle_message(data)
-    end
-  end)
-
-  -- Set up stderr reader
-  uv.read_start(stderr, function(err, data)
-    if data then
-      vim.notify("Uranus backend: " .. data:gsub("\n$", ""), vim.log.levels.INFO)
-    end
-  end)
-
-  vim.notify("Uranus backend started", vim.log.levels.INFO)
+  vim.notify("Uranus backend started with PID: " .. pid, vim.log.levels.INFO)
   return M.ok(true)
 end
 
 --- Stop the Rust backend process
 ---@return UranusResult
 function M.stop()
-  if not M.state.connected or not M.state.process then
+  if not M.state.connected then
     return M.ok(true)
   end
 
   -- Send shutdown command
   M.send_command("shutdown")
 
-  -- Close pipes and kill process
-  local uv = vim.loop
-  if M.state.process.stdin then
-    uv.close(M.state.process.stdin)
-  end
-  if M.state.process.stdout then
-    uv.close(M.state.process.stdout)
-  end
-  if M.state.process.stderr then
-    uv.close(M.state.process.stderr)
-  end
-  if M.state.process.handle then
-    uv.close(M.state.process.handle)
-  end
-
-  M.state.process = nil
+  M.state.binary_path = nil
   M.state.connected = false
 
   vim.notify("Uranus backend stopped", vim.log.levels.INFO)
@@ -144,9 +126,61 @@ end
 ---@param callback? fun(result: UranusResult) Response callback
 ---@return UranusResult
 function M.send_command(command, data, callback)
-  if not M.state.connected or not M.state.process then
+  if not M.state.connected or not M.state.binary_path then
     return M.err("NOT_CONNECTED", "Backend not connected")
   end
+
+  local request_id = "req_" .. M.state.request_id
+  M.state.request_id = M.state.request_id + 1
+
+  local message = {
+    id = request_id,
+    cmd = command,
+    data = data or {},
+  }
+
+  local json_message = vim.json.encode(message)
+
+  -- Use synchronous vim.system for communication
+  local ok, result = pcall(vim.system, {M.state.binary_path}, {
+    stdin = json_message,
+    text = true,
+  })
+
+  if not ok then
+    return M.err("EXEC_FAILED", "Failed to execute backend: " .. result)
+  end
+
+  -- Parse the response
+  if result.code ~= 0 then
+    return M.err("BACKEND_ERROR", "Backend error: " .. (result.stderr or ""))
+  end
+
+  local response_text = result.stdout
+
+  local ok, response = pcall(vim.json.decode, response_text)
+  if not ok then
+    vim.notify("Failed to parse response: " .. response_text, vim.log.levels.ERROR)
+    return M.err("PARSE_ERROR", "Failed to parse backend response")
+  end
+
+  -- Call callback if provided
+  if callback then
+    local result_obj
+    if response.success then
+      result_obj = M.ok(response.data)
+    else
+      result_obj = M.err(response.error.code or "BACKEND_ERROR", response.error.message or "Backend error")
+    end
+
+    local ok, err = pcall(callback, result_obj)
+    if not ok then
+      vim.notify("Callback error: " .. err, vim.log.levels.ERROR)
+    end
+  end
+
+  return M.ok(response)
+end
 
   local request_id = "req_" .. M.state.request_id
   M.state.request_id = M.state.request_id + 1
@@ -170,7 +204,7 @@ function M.send_command(command, data, callback)
   end
 
   -- Send message via libuv
-  local uv = vim.loop
+  vim.notify("Sending command to backend: " .. json_message:gsub("\n$", ""), vim.log.levels.DEBUG)
   uv.write(M.state.process.stdin, json_message, function(err)
     if err then
       vim.notify("Failed to send command to backend: " .. err, vim.log.levels.ERROR)
@@ -178,26 +212,22 @@ function M.send_command(command, data, callback)
       if M.state.pending_requests[request_id] then
         M.state.pending_requests[request_id] = nil
       end
+    else
+      vim.notify("Command sent successfully", vim.log.levels.DEBUG)
     end
   end)
 
   return M.ok(request_id)
 end
 
---- Handle incoming message from backend (called by stdout reader)
----@param data string Raw data from stdout
-function M._handle_message(data)
-  -- Process line by line
-  for line in vim.gsplit(data, "\n") do
-    if line ~= "" then
-      M._handle_response_line(line)
-    end
+-- Synchronous communication doesn't need async message handling
   end
 end
 
 --- Handle single response line from backend
 ---@param line string JSON response line
 function M._handle_response_line(line)
+  vim.notify("Received response from backend: " .. line:gsub("\n$", ""), vim.log.levels.DEBUG)
   local ok, response = pcall(vim.json.decode, line)
   if not ok then
     vim.notify("Failed to parse backend response: " .. line, vim.log.levels.WARN)
@@ -206,6 +236,7 @@ function M._handle_response_line(line)
 
   -- Handle response
   if response.id then
+    vim.notify("Handling response with ID: " .. response.id, vim.log.levels.DEBUG)
     M._handle_response(response)
   elseif response.event then
     M._handle_event(response)
@@ -273,6 +304,7 @@ end
 --- Handle response messages from backend
 ---@param message table Response message
 function M._handle_response(message)
+  vim.notify("Processing response: " .. vim.inspect(message), vim.log.levels.DEBUG)
   local request_id = message.id
   local pending = M.state.pending_requests[request_id]
 
@@ -290,8 +322,10 @@ function M._handle_response(message)
   if pending.callback then
     local result
     if message.success then
+      vim.notify("Response successful, calling callback", vim.log.levels.DEBUG)
       result = M.ok(message.data)
     else
+      vim.notify("Response failed: " .. (message.error and message.error.message or "Unknown error"), vim.log.levels.DEBUG)
       result = M.err(message.error.code or "BACKEND_ERROR", message.error.message or "Backend error")
     end
 
@@ -503,7 +537,7 @@ end
 function M.status()
   return {
     connected = M.state.connected,
-    process_running = M.state.process ~= nil and M.state.process.handle ~= nil,
+    binary_available = M.state.binary_path ~= nil,
     pending_requests = vim.tbl_count(M.state.pending_requests),
     registered_callbacks = vim.tbl_count(M.state.callbacks),
   }
