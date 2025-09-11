@@ -146,6 +146,16 @@ vim.api.nvim_create_user_command("UranusConnect", function(opts)
     return
   end
 
+  -- Auto-start backend if not running
+  if not uranus.state.backend_running then
+    vim.notify("Starting Uranus backend...", vim.log.levels.INFO)
+    local start_result = uranus.start_backend()
+    if not start_result.success then
+      vim.notify("Failed to start Uranus backend: " .. start_result.error.message, vim.log.levels.ERROR)
+      return
+    end
+  end
+
   local result = uranus.connect_kernel(kernel_name)
   if result.success then
     vim.notify("Connected to kernel: " .. kernel_name, vim.log.levels.INFO)
@@ -171,6 +181,16 @@ vim.api.nvim_create_user_command("UranusExecute", function(opts)
     return
   end
 
+  -- Auto-start backend if not running
+  if not uranus.state.backend_running then
+    vim.notify("Starting Uranus backend...", vim.log.levels.INFO)
+    local start_result = uranus.start_backend()
+    if not start_result.success then
+      vim.notify("Failed to start Uranus backend: " .. start_result.error.message, vim.log.levels.ERROR)
+      return
+    end
+  end
+
   local result = uranus.execute(code)
   if not result.success then
     vim.notify("Execution failed: " .. result.error.message, vim.log.levels.ERROR)
@@ -185,6 +205,39 @@ vim.api.nvim_create_user_command("UranusListKernels", function()
   local uranus = require("uranus")
   local kernel = require("uranus.kernel")
 
+  -- Auto-start backend if not running
+  if not uranus.state.backend_running then
+    vim.notify("Starting Uranus backend...", vim.log.levels.INFO)
+    local start_result = uranus.start_backend()
+    if not start_result.success then
+      vim.notify("Failed to start Uranus backend: " .. start_result.error.message, vim.log.levels.ERROR)
+      return
+    end
+
+    -- Give backend time to initialize and discover kernels
+    vim.defer_fn(function()
+      local result = kernel.discover_local_kernels()
+      if result.success then
+        local kernels = result.data
+        if #kernels == 0 then
+          vim.notify("No kernels found", vim.log.levels.WARN)
+          return
+        end
+
+        local lines = {"Available kernels:"}
+        for _, k in ipairs(kernels) do
+          table.insert(lines, string.format("  - %s (%s)", k.name, k.language))
+        end
+
+        vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+      else
+        vim.notify("Failed to list kernels: " .. result.error.message, vim.log.levels.ERROR)
+      end
+    end, 1000) -- Wait 1 second for backend to initialize
+    return
+  end
+
+  -- Backend is already running, discover kernels immediately
   local result = kernel.discover_local_kernels()
   if result.success then
     local kernels = result.data
@@ -197,6 +250,7 @@ vim.api.nvim_create_user_command("UranusListKernels", function()
     for _, k in ipairs(kernels) do
       table.insert(lines, string.format("  - %s (%s)", k.name, k.language))
     end
+
     vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
   else
     vim.notify("Failed to list kernels: " .. result.error.message, vim.log.levels.ERROR)
@@ -213,6 +267,16 @@ vim.api.nvim_create_user_command("UranusStartKernel", function(opts)
   if kernel_name == "" then
     vim.notify("Usage: UranusStartKernel <kernel_name>", vim.log.levels.ERROR)
     return
+  end
+
+  -- Auto-start backend if not running
+  if not uranus.state.backend_running then
+    vim.notify("Starting Uranus backend...", vim.log.levels.INFO)
+    local start_result = uranus.start_backend()
+    if not start_result.success then
+      vim.notify("Failed to start Uranus backend: " .. start_result.error.message, vim.log.levels.ERROR)
+      return
+    end
   end
 
   local kernel = require("uranus.kernel")
