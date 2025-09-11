@@ -1,29 +1,25 @@
 use std::collections::HashMap;
-use std::io::{self, BufRead, Write};
 use std::sync::Arc;
+use std::io::Write;
 use tokio::sync::Mutex;
-use serde::{Deserialize, Serialize};
 use anyhow::{Result, Context};
 use tracing::{info, error, warn};
+use serde_json;
 
-mod kernel;
-mod protocol;
-mod zmq_client;
-
-use kernel::KernelManager;
-use protocol::{Message, Response, Event};
+use uranus_rs::kernel::UranusKernelManager;
+use uranus_rs::protocol::{UranusRequest, UranusResponse, UranusError};
 
 #[derive(Clone)]
 pub struct AppState {
-    kernel_manager: Arc<Mutex<KernelManager>>,
-    pending_requests: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Response>>>>,
+    kernel_manager: Arc<Mutex<UranusKernelManager>>,
+    pending_requests: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<UranusResponse>>>>,
 }
 
 impl AppState {
     fn new() -> Self {
         Self {
-            kernel_manager: Arc::new(Mutex::new(KernelManager::new())),
-            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            kernel_manager: Arc::new(Mutex::new(UranusKernelManager::new())),
+            pending_requests: Arc::<Mutex<HashMap<String, tokio::sync::oneshot::Sender<UranusResponse>>>>::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -39,7 +35,7 @@ async fn main() -> Result<()> {
 
     let state = AppState::new();
 
-    // Initialize kernel manager
+    // Initialize kernel manager and discover kernels
     {
         let mut kernel_manager = state.kernel_manager.lock().await;
         kernel_manager.discover_kernels().await?;
@@ -47,8 +43,8 @@ async fn main() -> Result<()> {
     }
 
     // Main message loop
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
 
     for line in stdin.lines() {
         let line = line?;
@@ -60,22 +56,22 @@ async fn main() -> Result<()> {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Error processing message: {}", e);
-                Message::Response(Response {
+                UranusResponse {
                     id: "error".to_string(),
                     success: false,
-                    error: Some(protocol::Error {
+                    error: Some(UranusError {
                         code: "INTERNAL_ERROR".to_string(),
                         message: e.to_string(),
                         context: None,
                     }),
                     data: None,
-                })
+                }
             }
         };
 
         // Send response back to Lua
         let json_response = serde_json::to_string(&response)?;
-        writeln!(stdout, "{}", json_response)?;
+        println!("{}", json_response);
         stdout.flush()?;
     }
 
@@ -83,39 +79,21 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn process_message(state: &AppState, line: &str) -> Result<Message> {
-    let message: Message = serde_json::from_str(line)
+async fn process_message(state: &AppState, line: &str) -> Result<UranusResponse> {
+    let request: UranusRequest = serde_json::from_str(line)
         .context("Failed to parse JSON message")?;
 
-    match message {
-        Message::Request(request) => {
-            let response = handle_command(state, request).await?;
-            Ok(Message::Response(response))
-        }
-        _ => {
-            warn!("Received unexpected message type");
-            Ok(Message::Response(Response {
-                id: "unknown".to_string(),
-                success: false,
-                error: Some(protocol::Error {
-                    code: "INVALID_MESSAGE".to_string(),
-                    message: "Expected request message".to_string(),
-                    context: None,
-                }),
-                data: None,
-            }))
-        }
-    }
+    handle_command(state, request).await
 }
 
-async fn handle_command(state: &AppState, request: protocol::Request) -> Result<Response> {
+async fn handle_command(state: &AppState, request: UranusRequest) -> Result<UranusResponse> {
     info!("Handling command: {} ({})", request.cmd, request.id);
 
     match request.cmd.as_str() {
         "list_kernels" => {
             let kernel_manager = state.kernel_manager.lock().await;
-            let kernels = kernel_manager.list_kernels().await?;
-            Ok(Response {
+            let kernels = kernel_manager.list_kernels().await;
+            Ok(UranusResponse {
                 id: request.id,
                 success: true,
                 error: None,
@@ -135,20 +113,7 @@ async fn handle_command(state: &AppState, request: protocol::Request) -> Result<
             let mut kernel_manager = state.kernel_manager.lock().await;
             let kernel_info = kernel_manager.start_kernel(kernel_name).await?;
 
-            // Send kernel started event
-            if let Some(stdout) = &kernel_info.connection_file {
-                let event = Message::Event(Event {
-                    event: "kernel_started".to_string(),
-                    data: serde_json::json!({
-                        "kernel": kernel_name,
-                        "connection_file": stdout
-                    }),
-                });
-                // In a real implementation, you'd send this to the event stream
-                info!("Kernel started: {}", kernel_name);
-            }
-
-            Ok(Response {
+            Ok(UranusResponse {
                 id: request.id,
                 success: true,
                 error: None,
@@ -168,7 +133,7 @@ async fn handle_command(state: &AppState, request: protocol::Request) -> Result<
             let kernel_manager = state.kernel_manager.lock().await;
             let result = kernel_manager.execute_code(code).await?;
 
-            Ok(Response {
+            Ok(UranusResponse {
                 id: request.id,
                 success: true,
                 error: None,
@@ -182,7 +147,7 @@ async fn handle_command(state: &AppState, request: protocol::Request) -> Result<
             let mut kernel_manager = state.kernel_manager.lock().await;
             kernel_manager.shutdown().await?;
 
-            Ok(Response {
+            Ok(UranusResponse {
                 id: request.id,
                 success: true,
                 error: None,
@@ -192,10 +157,10 @@ async fn handle_command(state: &AppState, request: protocol::Request) -> Result<
 
         _ => {
             warn!("Unknown command: {}", request.cmd);
-            Ok(Response {
+            Ok(UranusResponse {
                 id: request.id,
                 success: false,
-                error: Some(protocol::Error {
+                error: Some(UranusError {
                     code: "UNKNOWN_COMMAND".to_string(),
                     message: format!("Unknown command: {}", request.cmd),
                     context: None,

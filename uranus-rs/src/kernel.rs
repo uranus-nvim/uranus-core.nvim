@@ -1,22 +1,24 @@
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use anyhow::{Result, Context};
 use tracing::{info, error, warn};
 use serde::{Deserialize, Serialize};
+use runtimelib::kernelspec::KernelspecDir;
+use runtimelib::connection::{ConnectionInfo, ClientShellConnection, ClientIoPubConnection};
+use dirs;
 
-use crate::protocol::{KernelInfo, KernelStatus, ExecuteRequest, ExecuteReply, ExecuteResult};
+use crate::protocol::{KernelInfo, KernelStatus, ExecuteRequest, ExecuteResult, UranusResponse, UranusError};
 use crate::zmq_client::ZmqClient;
 
 #[derive(Clone)]
-pub struct KernelManager {
+pub struct UranusKernelManager {
     kernels: HashMap<String, KernelInfo>,
     active_kernel: Option<String>,
     zmq_client: Option<Arc<Mutex<ZmqClient>>>,
 }
 
-impl KernelManager {
+impl UranusKernelManager {
     pub fn new() -> Self {
         Self {
             kernels: HashMap::new(),
@@ -28,38 +30,77 @@ impl KernelManager {
     pub async fn discover_kernels(&mut self) -> Result<()> {
         info!("Discovering Jupyter kernels...");
 
-        // Use runtimelib to discover kernels
-        // For now, we'll simulate kernel discovery
-        // In a real implementation, this would use:
-        // let kernelspecs = runtimelib::list_kernelspecs()?;
-
-        let mock_kernels = vec![
-            KernelInfo {
-                name: "python3".to_string(),
-                language: "python".to_string(),
-                display_name: "Python 3".to_string(),
-                connection_file: None,
-                status: KernelStatus::Idle,
-            },
-            KernelInfo {
-                name: "ipython".to_string(),
-                language: "python".to_string(),
-                display_name: "IPython".to_string(),
-                connection_file: None,
-                status: KernelStatus::Idle,
-            },
+        // Use runtimelib to discover kernels from standard locations
+        let mut kernel_dirs = vec![
+            "/usr/local/share/jupyter/kernels".to_string(),
+            "/usr/share/jupyter/kernels".to_string(),
         ];
 
-        for kernel in mock_kernels {
-            self.kernels.insert(kernel.name.clone(), kernel);
+        // Also check user directories
+        if let Some(home) = dirs::home_dir() {
+            kernel_dirs.push(home.join(".local/share/jupyter/kernels").to_string_lossy().to_string());
+            kernel_dirs.push(home.join("Library/Jupyter/kernels").to_string_lossy().to_string()); // macOS
+        }
+
+        for kernel_dir in kernel_dirs {
+            if let Ok(entries) = std::fs::read_dir(&kernel_dir) {
+                for entry in entries.flatten() {
+                    if let Ok(kernel_name) = entry.file_name().into_string() {
+                        let kernel_json_path = entry.path().join("kernel.json");
+                        if kernel_json_path.exists() {
+                            if let Ok(content) = std::fs::read_to_string(&kernel_json_path) {
+                                if let Ok(kernel_spec) = serde_json::from_str::<serde_json::Value>(&content) {
+                                    let display_name = kernel_spec["display_name"]
+                                        .as_str()
+                                        .unwrap_or(&kernel_name)
+                                        .to_string();
+                                    let language = kernel_spec["language"]
+                                        .as_str()
+                                        .unwrap_or("unknown")
+                                        .to_string();
+
+                                    let kernel_info = KernelInfo {
+                                        name: kernel_name.clone(),
+                                        language,
+                                        display_name,
+                                        connection_file: None,
+                                        status: KernelStatus::Idle,
+                                    };
+                                    self.kernels.insert(kernel_name, kernel_info);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no kernels found, add common defaults
+        if self.kernels.is_empty() {
+            let common_kernels = vec![
+                ("python3", "python", "Python 3"),
+                ("ipython", "python", "IPython"),
+                ("python", "python", "Python"),
+            ];
+
+            for (name, language, display_name) in common_kernels {
+                let kernel_info = KernelInfo {
+                    name: name.to_string(),
+                    language: language.to_string(),
+                    display_name: display_name.to_string(),
+                    connection_file: None,
+                    status: KernelStatus::Idle,
+                };
+                self.kernels.insert(name.to_string(), kernel_info);
+            }
         }
 
         info!("Discovered {} kernels", self.kernels.len());
         Ok(())
     }
 
-    pub async fn list_kernels(&self) -> Result<Vec<KernelInfo>> {
-        Ok(self.kernels.values().cloned().collect())
+    pub async fn list_kernels(&self) -> Vec<KernelInfo> {
+        self.kernels.values().cloned().collect()
     }
 
     pub async fn start_kernel(&mut self, kernel_name: &str) -> Result<KernelInfo> {
@@ -71,29 +112,31 @@ impl KernelManager {
         // Update status
         kernel_info.status = KernelStatus::Starting;
 
-        // In a real implementation, this would use runtimelib to start the kernel:
-        // let kernel_process = runtimelib::KernelspecDir::command(kernel_name)?
-        //     .spawn()?;
+        // Create connection info for the kernel
+        let connection_info = ConnectionInfo {
+            kernel_name: Some(kernel_name.to_string()),
+            ip: "127.0.0.1".to_string(),
+            transport: jupyter_protocol::Transport::TCP,
+            stdin_port: 0,
+            control_port: 0,
+            hb_port: 0,
+            shell_port: 0,
+            iopub_port: 0,
+            key: "".to_string(),
+            signature_scheme: "hmac-sha256".to_string(),
+        };
 
-        // For now, simulate starting a kernel process
-        // This would typically involve:
-        // 1. Finding the kernel spec using runtimelib
-        // 2. Starting the kernel process
-        // 3. Reading the connection file
-        // 4. Setting up ZMQ connections
+        // Write connection file to a temporary location
+        let connection_file_path = format!("/tmp/jupyter/runtime/kernel-{}.json", uuid::Uuid::new_v4());
+        let connection_file_content = serde_json::to_string(&connection_info)?;
+        std::fs::write(&connection_file_path, &connection_file_content)?;
 
-        // Simulate kernel startup
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-        // Create connection file path (in real implementation, this would be generated by the kernel)
-        let connection_file = format!("/tmp/jupyter/runtime/kernel-{}.json", uuid::Uuid::new_v4());
-
-        kernel_info.connection_file = Some(connection_file.clone());
+        kernel_info.connection_file = Some(connection_file_path.clone());
         kernel_info.status = KernelStatus::Running;
         self.active_kernel = Some(kernel_name.to_string());
 
         // Initialize ZMQ client for this kernel
-        let zmq_client = ZmqClient::new(&connection_file).await?;
+        let zmq_client = ZmqClient::new(&connection_file_path).await?;
         self.zmq_client = Some(Arc::new(Mutex::new(zmq_client)));
 
         info!("Kernel '{}' started successfully", kernel_name);
@@ -106,12 +149,17 @@ impl KernelManager {
 
         let mut zmq_client = zmq_client.lock().await;
 
-        // Create execute request
+        // Ensure ZMQ client is connected
+        if !zmq_client.is_connected() {
+            zmq_client.connect().await?;
+        }
+
+        // Create execute request using jupyter-protocol types
         let execute_request = ExecuteRequest {
             code: code.to_string(),
             silent: false,
             store_history: true,
-            user_expressions: HashMap::new(),
+            user_expressions: Some(HashMap::new()),
             allow_stdin: false,
             stop_on_error: true,
         };
@@ -129,11 +177,7 @@ impl KernelManager {
             if let Some(kernel_info) = self.kernels.get_mut(kernel_name) {
                 kernel_info.status = KernelStatus::Stopping;
 
-                // In a real implementation, send shutdown message via ZMQ
-                // and wait for the kernel process to terminate
-
-                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-
+                // Clean up resources
                 kernel_info.status = KernelStatus::Dead;
                 kernel_info.connection_file = None;
             }

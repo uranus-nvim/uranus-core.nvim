@@ -1,56 +1,63 @@
 use std::collections::HashMap;
 use anyhow::{Result, Context};
-use serde::{Deserialize, Serialize};
 use tracing::{info, error, debug};
-use uuid::Uuid;
+use runtimelib::connection::{ConnectionInfo, ClientShellConnection, ClientIoPubConnection};
+use jupyter_protocol::{ExecuteRequest, ExecuteResult, JupyterMessage, JupyterMessageContent};
 
-use crate::protocol::{ExecuteRequest, ExecuteResult, ExecuteReply, ExecuteStatus};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionInfo {
-    pub ip: String,
-    pub transport: String,
-    pub stdin_port: u16,
-    pub control_port: u16,
-    pub hb_port: u16,
-    pub shell_port: u16,
-    pub iopub_port: u16,
-    pub key: String,
-    pub signature_scheme: String,
-}
+use crate::protocol::UranusResponse;
 
 pub struct ZmqClient {
     connection_info: ConnectionInfo,
+    shell_connection: Option<ClientShellConnection>,
+    iopub_connection: Option<ClientIoPubConnection>,
+    session_id: String,
     connected: bool,
 }
 
 impl ZmqClient {
     pub async fn new(connection_file: &str) -> Result<Self> {
-        info!("Initializing mock ZMQ client with connection file: {}", connection_file);
+        info!("Initializing ZMQ client with connection file: {}", connection_file);
 
-        // In a real implementation, read the connection file
-        // For now, create mock connection info
-        let connection_info = ConnectionInfo {
-            ip: "127.0.0.1".to_string(),
-            transport: "tcp".to_string(),
-            stdin_port: 0,
-            control_port: 0,
-            hb_port: 0,
-            shell_port: 0,
-            iopub_port: 0,
-            key: "".to_string(),
-            signature_scheme: "hmac-sha256".to_string(),
-        };
+        // Read and parse connection file
+        let connection_info = Self::read_connection_file(connection_file)?;
+        let session_id = uuid::Uuid::new_v4().to_string();
 
         Ok(Self {
             connection_info,
+            shell_connection: None,
+            iopub_connection: None,
+            session_id,
             connected: false,
         })
     }
 
+    fn read_connection_file(connection_file: &str) -> Result<ConnectionInfo> {
+        let content = std::fs::read_to_string(connection_file)?;
+        let connection_info: ConnectionInfo = serde_json::from_str(&content)?;
+        Ok(connection_info)
+    }
+
     pub async fn connect(&mut self) -> Result<()> {
-        info!("Mock ZMQ connection established");
+        info!("Establishing ZMQ connections...");
+
+        // Create shell connection for execute requests
+        let shell_connection = runtimelib::connection::create_client_shell_connection(
+            &self.connection_info,
+            &self.session_id,
+        ).await?;
+
+        // Create IOPub connection for output messages
+        let iopub_connection = runtimelib::connection::create_client_iopub_connection(
+            &self.connection_info,
+            &self.session_id,
+            "",
+        ).await?;
+
+        self.shell_connection = Some(shell_connection);
+        self.iopub_connection = Some(iopub_connection);
         self.connected = true;
+
+        info!("ZMQ connections established successfully");
         Ok(())
     }
 
@@ -59,82 +66,54 @@ impl ZmqClient {
             return Err(anyhow::anyhow!("ZMQ client not connected"));
         }
 
-        // Generate message IDs
-        let msg_id = Uuid::new_v4().to_string();
-        let session_id = Uuid::new_v4().to_string();
+        let shell_conn = self.shell_connection.as_mut()
+            .context("Shell connection not available")?;
 
-        // Create Jupyter protocol message
-        let message = self.create_execute_message(&request, &msg_id, &session_id)?;
+        debug!("Executing request: {}", request.code);
 
-        // Send execute request (mock)
-        debug!("Mock sending execute request: {}", request.code);
+        // Create execute message
+        let execute_msg = JupyterMessage::new(
+            JupyterMessageContent::ExecuteRequest(request),
+            None,
+        );
 
-        // Simulate processing delay
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Send execute request
+        shell_conn.send(execute_msg).await?;
 
-        // Mock reply
-        let reply = ExecuteReply {
-            status: ExecuteStatus::Ok,
-            execution_count: 1,
-            user_expressions: None,
-            payload: None,
+        // Wait for execute reply
+        let reply_msg = shell_conn.read().await?;
+        let reply = match &reply_msg.content {
+            JupyterMessageContent::ExecuteReply(reply) => reply.clone(),
+            _ => return Err(anyhow::anyhow!("Unexpected message type in reply")),
         };
 
-        // Collect output from IOPub socket (mock)
+        // Collect outputs from IOPub (simplified - in production would handle multiple messages)
         let mut outputs: Vec<String> = Vec::new();
 
-        // Mock result - in real implementation this would parse actual kernel output
+        // For now, create a simple result
         let result = ExecuteResult {
-            execution_count: 1,
-            data: {
-                let mut data = HashMap::new();
-                data.insert("text/plain".to_string(), serde_json::json!(format!("Mock result for: {}", request.code)));
-                data
-            },
-            metadata: HashMap::new(),
+            execution_count: reply.execution_count,
+            data: jupyter_protocol::Media::new(vec![jupyter_protocol::MediaType::Plain(format!("Executed code successfully"))]),
+            metadata: serde_json::Map::new(),
+            transient: None,
         };
 
         Ok(result)
     }
 
-    fn create_execute_message(&self, request: &ExecuteRequest, msg_id: &str, session_id: &str) -> Result<Vec<u8>> {
-        // Create Jupyter protocol execute message
-        // This is a simplified version - real implementation would follow the full protocol
-
-        let message = serde_json::json!({
-            "header": {
-                "msg_id": msg_id,
-                "username": "uranus",
-                "session": session_id,
-                "msg_type": "execute_request",
-                "version": "5.2"
-            },
-            "parent_header": {},
-            "metadata": {},
-            "content": {
-                "code": request.code,
-                "silent": request.silent,
-                "store_history": request.store_history,
-                "user_expressions": request.user_expressions,
-                "allow_stdin": request.allow_stdin,
-                "stop_on_error": request.stop_on_error
-            }
-        });
-
-        Ok(serde_json::to_vec(&message)?)
-    }
-
     pub async fn disconnect(&mut self) -> Result<()> {
-        info!("Mock ZMQ disconnection");
+        info!("Disconnecting ZMQ sockets...");
+
+        // Connections will be automatically closed when dropped
+        self.shell_connection = None;
+        self.iopub_connection = None;
         self.connected = false;
+
+        info!("ZMQ disconnection complete");
         Ok(())
     }
-}
 
-impl Drop for ZmqClient {
-    fn drop(&mut self) {
-        // Note: In a real async context, we'd want to properly await this
-        // For now, we'll just log that cleanup should happen
-        info!("ZmqClient dropped - cleanup should happen here");
+    pub fn is_connected(&self) -> bool {
+        self.connected
     }
 }

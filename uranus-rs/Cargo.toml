@@ -1,11 +1,15 @@
 [package]
 name = "uranus-rs"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
+# Jupyter protocol and runtime libraries
+runtimelib = { version = "0.28", features = ["tokio-runtime"] }
+jupyter-protocol = "0.8"
+
 # Async runtime
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.36", features = ["full"] }
 
 # JSON serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -20,3 +24,6 @@ anyhow = "1.0"
 
 # UUID generation for message IDs
 uuid = { version = "1.0", features = ["v4"] }
+
+# Additional utilities
+dirs = "5.0"

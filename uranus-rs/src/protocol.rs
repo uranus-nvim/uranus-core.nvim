@@ -1,45 +1,51 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use jupyter_protocol::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Message {
-    Request(Request),
-    Response(Response),
-    Event(Event),
-}
+// Re-export commonly used types
+pub use jupyter_protocol::{
+    JupyterMessage,
+    JupyterMessageContent,
+    ExecuteRequest,
+    ExecuteReply,
+    ExecuteResult,
+    ConnectionInfo,
+    Transport,
+};
 
+// Simplified request/response types for our internal protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Request {
+pub struct UranusRequest {
     pub id: String,
     pub cmd: String,
     pub data: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Response {
+pub struct UranusResponse {
     pub id: String,
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<Error>,
+    pub error: Option<UranusError>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Event {
+pub struct UranusEvent {
     pub event: String,
     pub data: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Error {
+pub struct UranusError {
     pub code: String,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<serde_json::Value>,
 }
 
+// Kernel information structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KernelInfo {
     pub name: String,
@@ -58,65 +64,4 @@ pub enum KernelStatus {
     Busy,
     Stopping,
     Dead,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteRequest {
-    pub code: String,
-    pub silent: bool,
-    pub store_history: bool,
-    pub user_expressions: HashMap<String, String>,
-    pub allow_stdin: bool,
-    pub stop_on_error: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteReply {
-    pub status: ExecuteStatus,
-    pub execution_count: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user_expressions: Option<HashMap<String, serde_json::Value>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload: Option<Vec<serde_json::Value>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExecuteStatus {
-    Ok,
-    Error,
-    Abort,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteResult {
-    pub execution_count: u32,
-    pub data: HashMap<String, serde_json::Value>,
-    pub metadata: HashMap<String, serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StreamOutput {
-    pub name: String, // "stdout" or "stderr"
-    pub text: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorOutput {
-    pub ename: String,
-    pub evalue: String,
-    pub traceback: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatusMessage {
-    pub execution_state: String, // "busy", "idle", "starting"
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisplayData {
-    pub data: HashMap<String, serde_json::Value>,
-    pub metadata: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transient: Option<HashMap<String, serde_json::Value>>,
 }
