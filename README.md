@@ -51,95 +51,12 @@ Uranus.nvim provides **VSCode-like Jupyter integration** with two powerful modes
 ### Requirements
 
 - **Neovim ≥ 0.11.4**
-- **Jupyter** (`pip install jupyter`)
-- **Rust toolchain** (for building the backend)
-- **Optional**: `cargo install uranus-rs` for prebuilt binary
-
-### Using lazy.nvim
-
-```lua
-{
-  "yourname/uranus.nvim",
-  dependencies = {
-    "nvim-lua/plenary.nvim",
-    "nvim-telescope/telescope.nvim",
-    "folke/snacks.nvim",
-    { "OXY2DEV/markview.nvim", optional = true },
-    { "MeanderingProgrammer/render-markdown.nvim", optional = true },
-  },
-  build = function()
-    -- Build Rust backend
-    vim.fn.system("cargo build --release")
-  end,
-  config = function()
-    require("uranus").setup({
-      -- LSP integration
-      lsp = {
-        enable = true,
-        server = "pyright", -- or "pylsp", "jedi"
-      },
-
-      -- UI configuration
-      ui = {
-        mode = "both", -- "repl" | "notebook" | "both"
-        repl = {
-          view = "floating", -- "floating" | "virtualtext" | "terminal"
-          max_height = 20,
-          max_width = 80,
-        },
-        image = {
-          backend = "snacks", -- "snacks" | "image.nvim"
-          max_width = 800,
-          max_height = 600,
-        },
-        markdown_renderer = "markview", -- "markview" | "render-markdown"
-      },
-
-      -- Kernel configuration
-      kernels = {
-        auto_start = true,
-        default = "python3",
-        timeout = 10000, -- ms
-        discovery_paths = {
-          "~/.local/share/jupyter/runtime",
-          "/tmp/jupyter/runtime",
-        },
-      },
-
-      -- Remote servers
-      remote_servers = {
-        {
-          name = "work",
-          url = "http://jupyter.myserver.com:8888",
-          token = os.getenv("JUPYTER_TOKEN"),
-          headers = {},
-        },
-      },
-
-      -- Cell configuration
-      cell = {
-        marker = "# %%", -- cell separator
-        auto_execute = false,
-        highlight = true,
-      },
-
-      -- Output configuration
-      output = {
-        max_lines = 1000,
-        image_dir = vim.fn.stdpath("cache") .. "/uranus/images",
-        cleanup_temp = true,
-        cleanup_interval = 300000, -- 5 minutes
-      },
-    })
-  end,
-}
-```
 
 ### Manual Installation
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourname/uranus.nvim.git
+   git clone https://github.com/your-username/uranus.nvim.git
    cd uranus.nvim
    ```
 
@@ -156,44 +73,6 @@ Uranus.nvim provides **VSCode-like Jupyter integration** with two powerful modes
 ---
 
 ## 🚀 Quick Start
-
-### 1. Start the Backend
-
-```lua
-:lua require("uranus").start_backend()
-```
-
-### 2. Connect to a Kernel
-
-```lua
--- Local kernel
-:lua require("uranus").connect_kernel("python3")
-
--- Remote kernel
-:lua require("uranus").connect_remote("http://localhost:8888", "your-token")
-```
-
-### 3. Execute Code
-
-```python
-# %% Cell marker
-print("Hello from Uranus!")
-```
-
-```lua
--- Execute current cell
-vim.keymap.set("n", "<leader>rc", function()
-  require("uranus.repl").run_cell()
-end)
-
--- Execute selection
-vim.keymap.set("v", "<leader>rs", function()
-  require("uranus.repl").run_selection()
-end)
-```
-
----
-
 ## 📖 Usage Guide
 
 ### REPL / Cell Mode
@@ -307,134 +186,9 @@ require("uranus.remote").add_server({
 require("uranus.remote").connect("work-cluster", "python3")
 ```
 
-#### Telescope Integration
-```lua
--- Browse local kernels
-vim.keymap.set("n", "<leader>jl", function()
-  require("uranus.telescope").kernels()
-end)
-
--- Browse remote servers
-vim.keymap.set("n", "<leader>jr", function()
-  require("uranus.telescope").remote_servers()
-end)
-
--- Browse remote kernels
-vim.keymap.set("n", "<leader>jk", function()
-  require("uranus.telescope").remote_kernels()
-end)
-```
-
 ---
 
 ## 🔧 Configuration
-
-### Complete Configuration Example
-
-```lua
-require("uranus").setup({
-  -- Core settings
-  debug = false,
-  log_level = "INFO",
-
-  -- LSP integration
-  lsp = {
-    enable = true,
-    server = "pyright",
-    auto_attach = true,
-    diagnostics = true,
-  },
-
-  -- UI customization
-  ui = {
-    mode = "both",
-    theme = "auto", -- "light" | "dark" | "auto"
-    icons = {
-      kernel = "🧠",
-      running = "⚡",
-      success = "✅",
-      error = "❌",
-    },
-    repl = {
-      view = "floating",
-      position = "auto", -- "auto" | "cursor" | "center"
-      border = "rounded",
-      title = "Uranus Output",
-    },
-    notebook = {
-      renderer = "markview",
-      live_update = true,
-      show_line_numbers = true,
-    },
-  },
-
-  -- Kernel management
-  kernels = {
-    auto_start = true,
-    default = "python3",
-    timeout = 10000,
-    max_restarts = 3,
-    discovery_paths = {
-      "~/.local/share/jupyter/runtime",
-      "~/.jupyter/runtime",
-      "/tmp/jupyter/runtime",
-    },
-  },
-
-  -- Remote configuration
-  remote = {
-    timeout = 15000,
-    retry_attempts = 3,
-    ssl_verify = true,
-    proxy = os.getenv("HTTPS_PROXY"),
-  },
-
-  -- Cell configuration
-  cell = {
-    marker = "# %%",
-    highlight = {
-      enable = true,
-      fg = "#ff6b6b",
-      bg = "#f8f9fa",
-    },
-    folding = true,
-    auto_save = true,
-  },
-
-  -- Output handling
-  output = {
-    max_lines = 1000,
-    truncate_long_lines = true,
-    image = {
-      max_width = 800,
-      max_height = 600,
-      format = "png",
-      quality = 90,
-    },
-    cleanup = {
-      enable = true,
-      interval = 300000, -- 5 minutes
-      max_age = 3600000, -- 1 hour
-    },
-  },
-
-  -- Keymaps
-  keymaps = {
-    enable = true,
-    prefix = "<leader>u",
-    mappings = {
-      run_cell = "c",
-      run_all = "a",
-      run_selection = "s",
-      next_cell = "j",
-      prev_cell = "k",
-      kernel_select = "k",
-      notebook_toggle = "n",
-    },
-  },
-})
-```
-
 ### Configuration Validation
 
 Uranus validates your configuration and provides helpful error messages:
@@ -519,44 +273,48 @@ remote.disconnect()                      -- Disconnect remote
         │             Neovim                  │
         │             (Lua)                   │
         └─────────────────┬───────────────────┘
-                          │ JSON Protocol
+                          │ Msgpack-RPC Protocol
         ┌─────────────────▼───────────────────┐
-        │         Uranus Backend               │
-        │           (Rust)                     │
+        │         Uranus Backend              │
+        │  (runtimelib, jupyter-protocol,     │
+        │   jupyter-websocket-client, nbformat)│
         └─────────────────┬───────────────────┘
            ┌──────────────┴──────────────┐
            │                             │
-┌──────────▼─────────┐        ┌─────────▼──────────┐
+┌──────────▼─────────┐        ┌──────────▼─────────┐
 │   Local Kernel     │        │   Remote Kernel    │
-│     (ZMQ)          │        │   (WebSocket)      │
+│ (runtimelib +      │        │(jupyter-websocket-│
+│  jupyter-protocol) │        │     client)        │
 └────────────────────┘        └────────────────────┘
 ```
 
 ### Component Responsibilities
 
 - **Lua Frontend**: UI, cell parsing, output rendering, user interaction
-- **Rust Backend**: Kernel communication, protocol handling, performance-critical operations
-- **Local Kernels**: Direct ZMQ connection to Jupyter kernels
-- **Remote Kernels**: WebSocket streaming via JupyterHub/JupyterLab
+- **Rust Backend**: Kernel discovery and management with `runtimelib`, communication via `jupyter-protocol` and `jupyter-websocket-client`, protocol handling, performance-critical operations, notebook parsing with `nbformat`
+- **Local Kernels**: Kernel discovery with `runtimelib`, direct ZMQ connection using `jupyter-protocol` for message exchange
+- **Remote Kernels**: WebSocket streaming via JupyterHub/JupyterLab using `jupyter-websocket-client`
 
-### JSON Protocol
+### Msgpack-RPC Protocol
+
+Uranus uses Neovim's standard msgpack-RPC for efficient communication between Lua and Rust, providing better performance than JSON for binary data and complex structures.
 
 **Lua → Rust:**
-```json
-{ "cmd": "start_kernel", "kernel": "python3" }
-{ "cmd": "connect", "conn_file": "/tmp/kernel-123.json" }
-{ "cmd": "connect_remote", "server": "...", "token": "...", "kernel_id": "abc123" }
-{ "cmd": "execute", "code": "print(2+2)" }
-{ "cmd": "interrupt" }
+```lua
+{ method = "start_kernel", params = { kernel = "python3" } }
+{ method = "connect", params = { conn_file = "/tmp/kernel-123.json" } }
+{ method = "connect_remote", params = { server = "...", token = "...", kernel_id = "abc123" } }
+{ method = "execute", params = { code = "print(2+2)" } }
+{ method = "interrupt", params = {} }
 ```
 
 **Rust → Lua:**
-```json
-{ "event": "kernel_started", "kernel": "python3" }
-{ "event": "result", "stdout": "4\n" }
-{ "event": "display_data", "mime": "image/png", "base64": "..." }
-{ "event": "error", "ename": "NameError", "evalue": "name 'x' is not defined" }
-{ "event": "execution_state", "state": "busy" }
+```lua
+{ event = "kernel_started", data = { kernel = "python3" } }
+{ event = "result", data = { stdout = "4\n" } }
+{ event = "display_data", data = { mime = "image/png", base64 = "..." } }
+{ event = "error", data = { ename = "NameError", evalue = "name 'x' is not defined" } }
+{ event = "execution_state", data = { state = "busy" } }
 ```
 
 ---
@@ -564,17 +322,23 @@ remote.disconnect()                      -- Disconnect remote
 ## 🗺️ Roadmap
 
 ### **Phase 1: Core Foundation (MVP) - Q1 2025** ✅ 25% Complete
-- [x] **Plugin Architecture Setup**
-  - [x] Modern Neovim 0.11.4+ plugin structure
-  - [x] Lua ↔ Rust JSON communication protocol
-  - [x] Configuration validation system
-  - [x] Error handling framework
+- [ ] **Plugin Architecture Setup**
+  - [ ] Modern Neovim 0.11.4+ plugin structure
+  - [ ] Lua ↔ Rust msgpack-RPC communication protocol
+  - [ ] Configuration validation system
+  - [ ] Error handling framework
 
 - [ ] **Kernel Integration with `runtimelib`**
-  - [x] Local Jupyter kernel discovery using `runtimelib::list_kernelspecs()`
+  - [ ] Local Jupyter kernel discovery using `runtimelib::list_kernelspecs()`
   - [ ] Kernel startup/shutdown via `runtimelib::KernelspecDir::command()`
   - [ ] Basic code execution over ZeroMQ with `runtimelib`
   - [ ] Text output rendering with `jupyter-protocol` message types
+
+- [ ] **Remote Kernel Support with `jupyter-websocket-client`**
+  - [ ] JupyterHub integration using `jupyter-websocket-client`
+  - [ ] WebSocket connections for remote kernels
+  - [ ] Authentication handling with `jupyter-websocket-client`
+  - [ ] Remote server management and connection pooling
 
 - [ ] **Minimal REPL Mode**
   - [ ] Cell marker parsing (`#%%`)
@@ -584,9 +348,9 @@ remote.disconnect()                      -- Disconnect remote
 ### **Phase 2: Enhanced Features - Q2 2025** 🔄 In Progress
 - [ ] **Rich Output Rendering with `jupyter-protocol`**
   - [ ] Image display with snacks.nvim using `jupyter-protocol::DisplayData`
-  - [ ] HTML/Markdown rendering from `jupyter-protocol::MimeBundle`
+  - [ ] HTML/Markdown rendering from `jupyter-protocol::Media`
   - [ ] Table formatting with `jupyter-protocol` data types
-  - [ ] LaTeX/MathJax support for `jupyter-protocol::LatexData`
+  - [ ] LaTeX/MathJax support for `jupyter-protocol::Media`
 
 - [ ] **UI System**
   - [ ] Floating window outputs
@@ -595,18 +359,12 @@ remote.disconnect()                      -- Disconnect remote
   - [ ] Customizable layouts
 
 - [ ] **Notebook Mode with `nbformat`**
-  - [ ] Markdown buffer creation using `nbformat::Notebook`
-  - [ ] Interleaved code + output with `nbformat::Cell` parsing
+  - [ ] Notebook parsing and creation using `nbformat::Notebook`
+  - [ ] Interleaved code + output with `nbformat::v4` cell parsing
   - [ ] markview/render-markdown integration
   - [ ] Live preview updates with `nbformat` cell execution
 
 ### **Phase 3: Remote & Advanced Features - Q3 2025**
-- [ ] **Remote Kernel Support with `jupyter-websocket-client`**
-  - [ ] JupyterHub integration using `jupyter-websocket-client`
-  - [ ] WebSocket connections for remote kernels
-  - [ ] Authentication handling with `jupyter-websocket-client`
-  - [ ] Remote server management and connection pooling
-
 - [ ] **Telescope Integration**
   - [ ] Kernel selection picker with `runtimelib` kernel specs
   - [ ] Remote server picker with `jupyter-websocket-client` servers
@@ -632,7 +390,7 @@ remote.disconnect()                      -- Disconnect remote
   - [ ] Release automation with dependency updates
 
 - [ ] **User Experience**
-  - [ ] Default keymaps for `jupyter-protocol` operations
+  - [ ] Default keymaps for `runtimelib` and `jupyter-protocol` operations
   - [ ] Configuration presets for common `runtimelib` setups
   - [ ] Tutorial/documentation with `nbformat` examples
   - [ ] Community support and crate ecosystem integration
@@ -676,7 +434,7 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 ### Development Setup
 ```bash
 # Clone and setup
-git clone https://github.com/yourname/uranus.nvim.git
+git clone https://github.com/your-username/uranus.nvim.git
 cd uranus.nvim
 
 # Install dependencies
@@ -720,6 +478,6 @@ Licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for the Neovim community**
 
-[⭐ Star us on GitHub](https://github.com/yourname/uranus.nvim) • [📖 Read the docs](https://uranus-nvim.dev) • [💬 Join the discussion](https://github.com/yourname/uranus.nvim/discussions)
+[⭐ Star us on GitHub](https://github.com/your-username/uranus.nvim) • [📖 Read the docs](https://uranus-nvim.dev) • [💬 Join the discussion](https://github.com/your-username/uranus.nvim/discussions)
 
 </div>

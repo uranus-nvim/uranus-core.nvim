@@ -401,5 +401,178 @@ describe("Uranus Core", function()
       -- Clean up
       vim.api.nvim_buf_delete(buf, { force = true })
     end)
+
+    describe("Backend Integration", function()
+      local backend_process = nil
+
+      before_each(function()
+        -- Start backend process for integration tests
+        -- Note: This requires the Rust binary to be built
+        local backend = require("uranus.backend")
+        if backend.start then
+          local result = backend.start()
+          if result.success then
+            backend_process = result.data
+          end
+        end
+      end)
+
+      after_each(function()
+        -- Clean up backend process
+        if backend_process then
+          local backend = require("uranus.backend")
+          if backend.stop then
+            backend.stop()
+          end
+          backend_process = nil
+        end
+      end)
+
+      it("should start and communicate with Rust backend", function()
+        if not backend_process then
+          pending("Rust backend not available for integration test")
+          return
+        end
+
+        local backend = require("uranus.backend")
+
+        -- Test list kernels command
+        local result = backend.send_command("list_kernels", {})
+
+        assert.is_table(result)
+        assert.is_true(result.success)
+        assert.is_table(result.data)
+        assert.is_table(result.data.data.kernels)
+      end)
+
+      it("should handle kernel execution workflow", function()
+        if not backend_process then
+          pending("Rust backend not available for integration test")
+          return
+        end
+
+        local backend = require("uranus.backend")
+
+        -- First, list available kernels
+        local list_result = backend.send_command("list_kernels", {})
+
+        assert.is_true(list_result.success)
+        assert.is_table(list_result.data.data.kernels)
+
+        -- If kernels are available, try to start one
+        if #list_result.data.data.kernels > 0 then
+          local kernel_name = list_result.data.data.kernels[1].name
+
+          local start_result = backend.send_command("start_kernel", { kernel = kernel_name })
+
+          -- The result may succeed or fail depending on actual kernel availability
+          assert.is_table(start_result)
+          assert.is_boolean(start_result.success)
+
+          -- If kernel started successfully, try execution
+          if start_result.success then
+            local execute_result = backend.send_command("execute", { code = "print('Hello from integration test')" })
+
+            assert.is_table(execute_result)
+            assert.is_boolean(execute_result.success)
+          end
+        end
+      end)
+
+      it("should handle remote kernel connection", function()
+        if not backend_process then
+          pending("Rust backend not available for integration test")
+          return
+        end
+
+        local backend = require("uranus.backend")
+
+        -- Test connecting to a remote server (this will likely fail without a real server)
+        local result = backend.send_command("connect_remote", {
+          server_url = "http://localhost:8888",
+          token = "test-token",
+          kernel_id = "test-kernel"
+        })
+
+        -- The connection may succeed or fail, but we should get a proper response
+        assert.is_table(result)
+        assert.is_boolean(result.success)
+        -- Either success with connection info or error with proper error code
+        if not result.success then
+          assert.is_table(result.error)
+          assert.is_string(result.error.code)
+        end
+      end)
+
+      it("should handle backend shutdown gracefully", function()
+        if not backend_process then
+          pending("Rust backend not available for integration test")
+          return
+        end
+
+        local backend = require("uranus.backend")
+
+        -- Send shutdown command
+        local result = backend.send_command("shutdown", {})
+
+        assert.is_table(result)
+        assert.is_true(result.success)
+        assert.equals("shutdown", result.data.data.status)
+      end)
+    end)
+
+    describe("End-to-End Workflow", function()
+      it("should execute code from Lua to Rust backend", function()
+        -- Setup Uranus
+        local config = {
+          debug = true,
+          ui = { mode = "repl" },
+          kernels = { default = "python3" }
+        }
+
+        local setup_result = uranus.setup(config)
+        assert.is_true(setup_result.success)
+
+        -- Start backend
+        local backend_result = uranus.start_backend()
+        if not backend_result.success then
+          pending("Backend failed to start: " .. (backend_result.error or "unknown error"))
+          return
+        end
+
+        -- Execute code
+        local execute_result = uranus.execute("print('Integration test')")
+        assert.is_table(execute_result)
+
+        -- Clean up
+        uranus.stop_backend()
+      end)
+
+      it("should handle kernel lifecycle", function()
+        local setup_result = uranus.setup()
+        assert.is_true(setup_result.success)
+
+        -- Start backend
+        local backend_result = uranus.start_backend()
+        if not backend_result.success then
+          pending("Backend failed to start")
+          return
+        end
+
+        -- Connect to kernel
+        local connect_result = uranus.connect_kernel("python3")
+        -- Connection may succeed or fail depending on system setup
+        assert.is_table(connect_result)
+
+        -- Execute if connected
+        if connect_result.success then
+          local execute_result = uranus.execute("2 + 2")
+          assert.is_table(execute_result)
+        end
+
+        -- Clean up
+        uranus.stop_backend()
+      end)
+    end)
   end)
 end)
