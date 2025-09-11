@@ -1,0 +1,79 @@
+# Build artifacts
+target/
+*.so
+*.dylib
+*.dll
+
+# Lua rocks
+*.rock
+*.rockspec
+
+# Neovim
+*.swp
+*.swo
+*.tmp
+*.bak
+.shada
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Test coverage
+.coverage/
+*.profraw
+*.profdata
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+node_modules/
+
+# Documentation build
+doc/tags
+*.html
+
+# Release artifacts
+releases/
+
+# Local configuration
+.config/
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter runtime files (if any are created locally)
+.jupyter/
+.local/share/jupyter/runtime/
+
+# Rust specific
+Cargo.lock
+.cargo/
+
+# Lua specific
+.luarc.json
+.luarocks/
+
+# CI/CD
+.github/workflows/*.log
