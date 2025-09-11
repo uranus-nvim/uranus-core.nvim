@@ -449,10 +449,6 @@ function M._find_binary()
   vim.notify("Uranus backend binary not found. Please build with: cargo build --release", vim.log.levels.WARN)
   return nil
 end
-  end
-
-  return nil
-end
 
 --- Get backend status
 ---@return table Backend status information
