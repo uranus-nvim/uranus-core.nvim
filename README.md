@@ -563,30 +563,30 @@ remote.disconnect()                      -- Disconnect remote
 
 ## 🗺️ Roadmap
 
-### **Phase 1: Core Foundation (MVP) - Q1 2025** ✅ 15% Complete
-- [ ] **Plugin Architecture Setup**
-  - [ ] Modern Neovim 0.11.4+ plugin structure
-  - [ ] Lua ↔ Rust JSON communication protocol
-  - [ ] Configuration validation system
-  - [ ] Error handling framework
+### **Phase 1: Core Foundation (MVP) - Q1 2025** ✅ 25% Complete
+- [x] **Plugin Architecture Setup**
+  - [x] Modern Neovim 0.11.4+ plugin structure
+  - [x] Lua ↔ Rust JSON communication protocol
+  - [x] Configuration validation system
+  - [x] Error handling framework
 
-- [ ] **Basic Kernel Integration**
-  - [ ] Local Jupyter kernel discovery
-  - [ ] Simple kernel startup/shutdown
-  - [ ] Basic code execution
-  - [ ] Text output rendering
+- [ ] **Kernel Integration with `runtimelib`**
+  - [x] Local Jupyter kernel discovery using `runtimelib::list_kernelspecs()`
+  - [ ] Kernel startup/shutdown via `runtimelib::KernelspecDir::command()`
+  - [ ] Basic code execution over ZeroMQ with `runtimelib`
+  - [ ] Text output rendering with `jupyter-protocol` message types
 
 - [ ] **Minimal REPL Mode**
   - [ ] Cell marker parsing (`#%%`)
-  - [ ] Basic cell execution
-  - [ ] Simple output display
+  - [ ] Basic cell execution with `jupyter-protocol::ExecuteRequest`
+  - [ ] Simple output display using `jupyter-protocol::ExecuteReply`
 
 ### **Phase 2: Enhanced Features - Q2 2025** 🔄 In Progress
-- [ ] **Rich Output Rendering**
-  - [ ] Image display with snacks.nvim
-  - [ ] HTML/Markdown rendering
-  - [ ] Table formatting
-  - [ ] LaTeX/MathJax support
+- [ ] **Rich Output Rendering with `jupyter-protocol`**
+  - [ ] Image display with snacks.nvim using `jupyter-protocol::DisplayData`
+  - [ ] HTML/Markdown rendering from `jupyter-protocol::MimeBundle`
+  - [ ] Table formatting with `jupyter-protocol` data types
+  - [ ] LaTeX/MathJax support for `jupyter-protocol::LatexData`
 
 - [ ] **UI System**
   - [ ] Floating window outputs
@@ -594,66 +594,66 @@ remote.disconnect()                      -- Disconnect remote
   - [ ] Terminal/tmux output
   - [ ] Customizable layouts
 
-- [ ] **Notebook Mode**
-  - [ ] Markdown buffer creation
-  - [ ] Interleaved code + output
+- [ ] **Notebook Mode with `nbformat`**
+  - [ ] Markdown buffer creation using `nbformat::Notebook`
+  - [ ] Interleaved code + output with `nbformat::Cell` parsing
   - [ ] markview/render-markdown integration
-  - [ ] Live preview updates
+  - [ ] Live preview updates with `nbformat` cell execution
 
 ### **Phase 3: Remote & Advanced Features - Q3 2025**
-- [ ] **Remote Kernel Support**
-  - [ ] JupyterHub integration
-  - [ ] WebSocket connections
-  - [ ] Authentication handling
-  - [ ] Remote server management
+- [ ] **Remote Kernel Support with `jupyter-websocket-client`**
+  - [ ] JupyterHub integration using `jupyter-websocket-client`
+  - [ ] WebSocket connections for remote kernels
+  - [ ] Authentication handling with `jupyter-websocket-client`
+  - [ ] Remote server management and connection pooling
 
 - [ ] **Telescope Integration**
-  - [ ] Kernel selection picker
-  - [ ] Remote server picker
-  - [ ] Custom telescope extensions
+  - [ ] Kernel selection picker with `runtimelib` kernel specs
+  - [ ] Remote server picker with `jupyter-websocket-client` servers
+  - [ ] Custom telescope extensions for kernel management
 
 - [ ] **LSP Integration**
   - [ ] LSP server management
-  - [ ] Completion in cells
-  - [ ] Diagnostics display
-  - [ ] Hover information
+  - [ ] Completion in cells using kernel introspection
+  - [ ] Diagnostics display from `jupyter-protocol::Error` messages
+  - [ ] Hover information from kernel help system
 
 ### **Phase 4: Polish & Distribution - Q4 2025**
 - [ ] **Quality Assurance**
-  - [ ] Comprehensive test suite
-  - [ ] Integration tests
-  - [ ] Performance benchmarks
-  - [ ] Documentation
+  - [ ] Comprehensive test suite with `jupyter-protocol` message testing
+  - [ ] Integration tests with `runtimelib` and `jupyter-websocket-client`
+  - [ ] Performance benchmarks for ZeroMQ/WebSocket throughput
+  - [ ] Documentation with crate-specific examples
 
 - [ ] **Distribution**
-  - [ ] Prebuilt Rust binaries
-  - [ ] Luarocks package
-  - [ ] GitHub Actions CI/CD
-  - [ ] Release automation
+  - [ ] Prebuilt Rust binaries with all crates bundled
+  - [ ] Luarocks package with Rust dependencies
+  - [ ] GitHub Actions CI/CD with crate testing
+  - [ ] Release automation with dependency updates
 
 - [ ] **User Experience**
-  - [ ] Default keymaps
-  - [ ] Configuration presets
-  - [ ] Tutorial/documentation
-  - [ ] Community support
+  - [ ] Default keymaps for `jupyter-protocol` operations
+  - [ ] Configuration presets for common `runtimelib` setups
+  - [ ] Tutorial/documentation with `nbformat` examples
+  - [ ] Community support and crate ecosystem integration
 
 ### **Future Enhancements (2026+)**
 - [ ] **Multi-language Support**
-  - [ ] Enhanced R kernel support
-  - [ ] Julia kernel integration
-  - [ ] Custom kernel support
+  - [ ] Enhanced R kernel support with `runtimelib` R kernels
+  - [ ] Julia kernel integration via `jupyter-protocol`
+  - [ ] Custom kernel support with extensible `jupyter-protocol` types
 
 - [ ] **Advanced Features**
-  - [ ] Collaborative editing
-  - [ ] Version control integration
-  - [ ] Plugin ecosystem
-  - [ ] Cloud deployment
+  - [ ] Collaborative editing with `jupyter-websocket-client` multi-user
+  - [ ] Version control integration with `nbformat` diffing
+  - [ ] Plugin ecosystem for custom `jupyter-protocol` message handlers
+  - [ ] Cloud deployment with `jupyter-websocket-client` scaling
 
 - [ ] **Performance & Scale**
-  - [ ] Large notebook handling
-  - [ ] Memory optimization
-  - [ ] Async processing
-  - [ ] Caching system
+  - [ ] Large notebook handling with `nbformat` streaming
+  - [ ] Memory optimization for `jupyter-protocol` message processing
+  - [ ] Async processing with `runtimelib` concurrent kernel operations
+  - [ ] Caching system for `jupyter-websocket-client` connections
 
 ---
 

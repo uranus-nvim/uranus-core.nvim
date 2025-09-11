@@ -127,9 +127,13 @@ function M.display_floating(content, opts)
     col = col,
     style = "minimal",
     border = opts.border or M.config.ui.repl.border or "rounded",
-    title = opts.title,
-    title_pos = "center",
   }
+
+  -- Only set title options if title is provided
+  if opts.title then
+    win_opts.title = opts.title
+    win_opts.title_pos = "center"
+  end
 
   -- Create window
   local win = vim.api.nvim_open_win(buf, true, win_opts)

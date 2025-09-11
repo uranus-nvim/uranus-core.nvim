@@ -52,120 +52,50 @@ M.active_kernels = {}
 function M.init(config)
   M.config = config
 
-  -- Discover local kernels on startup
+  -- Discover local kernels on startup (only if backend is available)
   if config.kernels.auto_start then
-    local result = M.discover_local_kernels()
-    if not result.success then
-      return result
+    local backend = require("uranus.backend")
+    if backend.state.connected then
+      local result = M.discover_local_kernels()
+      if not result.success then
+        return result
+      end
     end
   end
 
   return M.ok(true)
 end
 
---- Discover local Jupyter kernels
+--- Discover local Jupyter kernels using Rust backend
 ---@return UranusResult<UranusKernelInfo[]>
 function M.discover_local_kernels()
+  local backend = require("uranus.backend")
+  local result = backend.send_command("list_kernelspecs", {
+    paths = M.config.kernels.discovery_paths
+  })
+
+  if not result.success then
+    return result
+  end
+
+  -- Transform Rust response to Lua kernel info format
   local kernels = {}
-
-  -- Search in configured discovery paths
-  for _, path in ipairs(M.config.kernels.discovery_paths) do
-    local expanded_path = vim.fn.expand(path)
-    if vim.fn.isdirectory(expanded_path) == 1 then
-      local result = M._scan_directory(expanded_path)
-      if result.success then
-        vim.list_extend(kernels, result.data)
-      end
-    end
+  for _, spec in ipairs(result.data.kernelspecs or {}) do
+    table.insert(kernels, {
+      id = spec.name,
+      name = spec.name,
+      language = spec.language or "unknown",
+      spec = spec, -- Keep full spec for Rust backend
+      status = "available",
+      type = "local",
+    })
   end
 
-  -- Remove duplicates by kernel name
-  local unique_kernels = {}
-  local seen = {}
-  for _, kernel in ipairs(kernels) do
-    if not seen[kernel.name] then
-      seen[kernel.name] = true
-      table.insert(unique_kernels, kernel)
-    end
-  end
+  M.discovered_kernels = kernels
 
-  M.discovered_kernels = unique_kernels
-
-  vim.notify("Discovered " .. #unique_kernels .. " local kernels", vim.log.levels.INFO)
-
-  return M.ok(unique_kernels)
-end
-
---- Scan directory for kernel connection files
----@param directory string Directory to scan
----@return UranusResult<UranusKernelInfo[]>
-function M._scan_directory(directory)
-  local kernels = {}
-
-  -- Find all .json files in the directory
-  local files = vim.fn.glob(directory .. "/*.json", false, true)
-
-  for _, file in ipairs(files) do
-    local result = M._parse_connection_file(file)
-    if result.success then
-      table.insert(kernels, result.data)
-    end
-  end
+  vim.notify("Discovered " .. #kernels .. " local kernels", vim.log.levels.INFO)
 
   return M.ok(kernels)
-end
-
---- Parse Jupyter connection file
----@param file_path string Path to connection file
----@return UranusResult<UranusKernelInfo>
-function M._parse_connection_file(file_path)
-  local ok, content = pcall(vim.fn.readfile, file_path)
-  if not ok then
-    return M.err("READ_FAILED", "Failed to read connection file: " .. file_path)
-  end
-
-  local ok, data = pcall(vim.json.decode, table.concat(content, "\n"))
-  if not ok then
-    return M.err("PARSE_FAILED", "Failed to parse connection file: " .. file_path)
-  end
-
-  -- Validate required fields
-  if not data.kernel_name then
-    return M.err("INVALID_CONNECTION", "Connection file missing kernel_name: " .. file_path)
-  end
-
-  local kernel_info = {
-    id = data.kernel_name .. "_" .. vim.fn.fnamemodify(file_path, ":t:r"),
-    name = data.kernel_name,
-    language = M._detect_language(data),
-    connection_file = file_path,
-    status = "running", -- Assume running if file exists
-    type = "local",
-  }
-
-  return M.ok(kernel_info)
-end
-
---- Detect programming language from kernel info
----@param kernel_data table Kernel connection data
----@return string Detected language
-function M._detect_language(kernel_data)
-  local name = kernel_data.kernel_name:lower()
-
-  -- Common language mappings
-  if name:match("python") then
-    return "python"
-  elseif name:match("r") then
-    return "r"
-  elseif name:match("julia") then
-    return "julia"
-  elseif name:match("javascript") or name:match("node") then
-    return "javascript"
-  elseif name:match("bash") or name:match("shell") then
-    return "bash"
-  else
-    return "unknown"
-  end
 end
 
 --- Connect to a kernel
@@ -188,14 +118,13 @@ function M.connect(kernel_name)
   local result
 
   if kernel.type == "local" then
-    result = backend.send_command("connect", {
-      conn_file = kernel.connection_file,
+    result = backend.send_command("connect_kernel", {
+      kernelspec = kernel.spec,
     })
   else
     -- Remote kernel connection
-    result = backend.send_command("connect_remote", {
-      server = kernel.server.url,
-      token = kernel.server.token,
+    result = backend.send_command("connect_remote_kernel", {
+      server = kernel.server,
       kernel_id = kernel.id,
     })
   end
@@ -243,26 +172,23 @@ function M.execute(code, opts)
     return M.err("NO_KERNEL", "No kernel connected")
   end
 
-  -- Send execution command to backend
+  -- Send execute_request to backend
   local backend = require("uranus.backend")
-  local result = backend.send_command("execute", {
+  local result = backend.send_command("execute_request", {
     code = code,
     kernel_id = opts.kernel_id or M.current_kernel.id,
+    silent = opts.silent or false,
+    store_history = true,
+    user_expressions = {},
+    allow_stdin = false,
   })
 
   if not result.success then
     return result
   end
 
-  -- Wait for result (simplified - in real implementation this would be async)
-  -- TODO: Implement proper async result handling
-  return M.ok({
-    success = true,
-    stdout = "",
-    stderr = "",
-    display_data = {},
-    execution_count = 1,
-  })
+  -- Backend will handle async result delivery via events
+  return M.ok(result.data)
 end
 
 --- Start a new kernel
@@ -271,22 +197,18 @@ end
 function M.start_kernel(kernel_name)
   local backend = require("uranus.backend")
   local result = backend.send_command("start_kernel", {
-    kernel = kernel_name,
+    kernel_name = kernel_name,
   })
 
   if not result.success then
     return result
   end
 
-  -- Wait for kernel to start and discover it
-  vim.defer_fn(function()
-    M.discover_local_kernels()
-  end, 1000) -- Wait 1 second for kernel to start
-
+  -- Backend handles kernel startup and will send events when ready
   return M.ok({
     id = kernel_name,
     name = kernel_name,
-    language = M._detect_language({ kernel_name = kernel_name }),
+    language = "unknown", -- Will be updated when kernel starts
     status = "starting",
     type = "local",
   })
@@ -297,7 +219,7 @@ end
 ---@return UranusResult
 function M.stop_kernel(kernel_id)
   local backend = require("uranus.backend")
-  local result = backend.send_command("stop_kernel", {
+  local result = backend.send_command("shutdown_request", {
     kernel_id = kernel_id,
   })
 
@@ -445,7 +367,9 @@ function M.interrupt()
   end
 
   local backend = require("uranus.backend")
-  return backend.send_command("interrupt")
+  return backend.send_command("interrupt_request", {
+    kernel_id = M.current_kernel.id,
+  })
 end
 
 --- Create success result

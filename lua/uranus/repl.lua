@@ -79,6 +79,13 @@ function M.parse_cells(bufnr)
         current_cell.code = current_cell.code .. "\n"
       end
       current_cell.code = current_cell.code .. line
+    elseif not current_cell and line ~= "" then
+      -- Start first cell if we haven't found a marker yet
+      current_cell = {
+        start_line = i - 1, -- 0-based line number
+        code = line,
+        marker = nil, -- No marker for first cell
+      }
     end
   end
 

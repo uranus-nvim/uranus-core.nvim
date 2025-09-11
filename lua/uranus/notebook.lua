@@ -98,37 +98,22 @@ function M.open(filepath)
     return M.err("FILE_NOT_FOUND", "Notebook file not found: " .. filepath)
   end
 
-  -- Read notebook file
-  local content = vim.fn.readfile(filepath)
-  if #content == 0 then
-    return M.err("EMPTY_FILE", "Notebook file is empty: " .. filepath)
+  -- Send notebook file to backend for parsing
+  local backend = require("uranus.backend")
+  local result = backend.send_command("parse_notebook", {
+    filepath = filepath
+  })
+
+  if not result.success then
+    return result
   end
 
-  -- Parse notebook JSON (simplified - would need full nbformat support)
-  local ok, notebook_data = pcall(vim.json.decode, table.concat(content, "\n"))
-  if not ok then
-    return M.err("PARSE_FAILED", "Failed to parse notebook file: " .. filepath)
-  end
-
-  -- Create buffer and populate with cells
+  -- Create buffer and populate with parsed content
   local buf = vim.api.nvim_create_buf(false, false)
   vim.api.nvim_buf_set_name(buf, "Notebook: " .. vim.fn.fnamemodify(filepath, ":t"))
 
-  -- Convert notebook cells to buffer content
-  local lines = {}
-  for _, cell in ipairs(notebook_data.cells or {}) do
-    if cell.cell_type == "code" then
-      table.insert(lines, "# %%")
-      for _, line in ipairs(vim.split(cell.source, "\n")) do
-        table.insert(lines, line)
-      end
-    elseif cell.cell_type == "markdown" then
-      for _, line in ipairs(vim.split(cell.source, "\n")) do
-        table.insert(lines, line)
-      end
-    end
-  end
-
+  -- Use parsed content from backend
+  local lines = result.data.lines or {}
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
   -- Create notebook object
@@ -161,13 +146,15 @@ function M.save(notebook, filepath)
     end
   end
 
-  -- Convert notebook to nbformat
-  local notebook_data = M._notebook_to_nbformat(notebook)
+  -- Send notebook to backend for nbformat conversion and saving
+  local backend = require("uranus.backend")
+  local result = backend.send_command("save_notebook", {
+    notebook = notebook,
+    filepath = filepath
+  })
 
-  -- Write to file
-  local ok = pcall(vim.fn.writefile, { vim.json.encode(notebook_data) }, filepath)
-  if not ok then
-    return M.err("SAVE_FAILED", "Failed to save notebook: " .. filepath)
+  if not result.success then
+    return result
   end
 
   vim.notify("Notebook saved to " .. filepath, vim.log.levels.INFO)
@@ -311,51 +298,7 @@ function M._setup_notebook_keymaps(notebook)
   end, vim.tbl_extend("force", opts, { desc = "Close notebook" }))
 end
 
---- Convert notebook to Jupyter nbformat
----@param notebook UranusNotebook Notebook object
----@return table Notebook in nbformat
-function M._notebook_to_nbformat(notebook)
-  local cells = {}
 
-  for _, cell in ipairs(notebook.cells) do
-    local nb_cell = {
-      cell_type = "code",
-      source = cell.code,
-      metadata = {},
-      outputs = {},
-    }
-
-    -- Add outputs if available
-    if cell.output then
-      -- Convert Uranus output to nbformat output
-      -- This is simplified - would need full output conversion
-      table.insert(nb_cell.outputs, {
-        output_type = "stream",
-        name = "stdout",
-        text = cell.output.stdout or "",
-      })
-    end
-
-    table.insert(cells, nb_cell)
-  end
-
-  return {
-    cells = cells,
-    metadata = {
-      kernelspec = {
-        display_name = "Python 3",
-        language = "python",
-        name = "python3",
-      },
-      language_info = {
-        name = "python",
-        version = "3.8.0",
-      },
-    },
-    nbformat = 4,
-    nbformat_minor = 2,
-  }
-end
 
 --- Set up notebook autocommands
 function M._setup_autocommands()

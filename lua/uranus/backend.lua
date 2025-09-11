@@ -204,15 +204,21 @@ function M._handle_event(message)
     end
   end
 
-  -- Handle built-in events
-  if event == "kernel_started" then
-    M._handle_kernel_started(data)
-  elseif event == "kernel_connected" then
-    M._handle_kernel_connected(data)
-  elseif event == "execution_result" then
-    M._handle_execution_result(data)
+  -- Handle Jupyter protocol events
+  if event == "status" then
+    M._handle_status(data)
+  elseif event == "execute_reply" then
+    M._handle_execute_reply(data)
+  elseif event == "execute_result" then
+    M._handle_execute_result(data)
+  elseif event == "display_data" then
+    M._handle_display_data(data)
+  elseif event == "stream" then
+    M._handle_stream(data)
   elseif event == "error" then
     M._handle_error(data)
+  elseif event == "kernel_info_reply" then
+    M._handle_kernel_info_reply(data)
   end
 end
 
@@ -294,67 +300,117 @@ function M.off(event, callback)
   end
 end
 
---- Set up built-in event handlers
+--- Set up built-in event handlers for Jupyter protocol
 function M._setup_event_handlers()
-  -- Kernel events
-  M.on("kernel_started", function(data)
-    vim.notify("Kernel started: " .. (data.kernel or "unknown"), vim.log.levels.INFO)
-  end)
-
-  M.on("kernel_connected", function(data)
-    vim.notify("Connected to kernel: " .. (data.kernel or "unknown"), vim.log.levels.INFO)
+  -- Kernel status events
+  M.on("status", function(data)
+    local kernel = require("uranus.kernel")
+    if kernel.current_kernel then
+      kernel.current_kernel.status = data.execution_state
+      vim.notify("Kernel status: " .. data.execution_state, vim.log.levels.INFO)
+    end
   end)
 
   -- Execution events
-  M.on("execution_result", function(data)
-    -- Handle execution results
-    local output = require("uranus.output")
-    output.handle_result(data)
+  M.on("execute_reply", function(data)
+    -- Handle execution completion
+    if data.status == "ok" then
+      vim.notify("Execution completed", vim.log.levels.INFO)
+    else
+      vim.notify("Execution failed: " .. (data.ename or "Unknown error"), vim.log.levels.ERROR)
+    end
   end)
 
-  M.on("execution_error", function(data)
-    vim.notify("Execution error: " .. (data.message or "Unknown error"), vim.log.levels.ERROR)
+  M.on("execute_result", function(data)
+    local output = require("uranus.output")
+    output.handle_result({
+      success = true,
+      execution_count = data.execution_count,
+      display_data = {data.data},
+    })
+  end)
+
+  M.on("display_data", function(data)
+    local output = require("uranus.output")
+    output.display_rich_output(data.data)
+  end)
+
+  M.on("stream", function(data)
+    local output = require("uranus.output")
+    if data.name == "stdout" then
+      output.display_text(data.text, "stdout")
+    elseif data.name == "stderr" then
+      output.display_text(data.text, "stderr")
+    end
   end)
 
   -- Error events
   M.on("error", function(data)
-    vim.notify("Backend error: " .. (data.message or "Unknown error"), vim.log.levels.ERROR)
+    vim.notify("Jupyter error: " .. (data.ename or "Unknown error"), vim.log.levels.ERROR)
+  end)
+
+  M.on("kernel_info_reply", function(data)
+    vim.notify("Connected to " .. (data.language_info.name or "unknown") .. " kernel", vim.log.levels.INFO)
   end)
 end
 
---- Handle kernel started event
+--- Handle kernel status event
 ---@param data table Event data
-function M._handle_kernel_started(data)
-  -- Update kernel status
+function M._handle_status(data)
   local kernel = require("uranus.kernel")
   if kernel.current_kernel then
-    kernel.current_kernel.status = "running"
+    kernel.current_kernel.status = data.execution_state
   end
 end
 
---- Handle kernel connected event
+--- Handle execute reply event
 ---@param data table Event data
-function M._handle_kernel_connected(data)
-  -- Update kernel status
-  local kernel = require("uranus.kernel")
-  if kernel.current_kernel then
-    kernel.current_kernel.status = "running"
-  end
+function M._handle_execute_reply(data)
+  -- Execution completion is handled by the event callback above
 end
 
---- Handle execution result event
+--- Handle execute result event
 ---@param data table Event data
-function M._handle_execution_result(data)
-  -- Forward to output handler
+function M._handle_execute_result(data)
   local output = require("uranus.output")
-  output.handle_result(data)
+  output.handle_result({
+    success = true,
+    execution_count = data.execution_count,
+    display_data = {data.data},
+  })
+end
+
+--- Handle display data event
+---@param data table Event data
+function M._handle_display_data(data)
+  local output = require("uranus.output")
+  output.display_rich_output(data.data)
+end
+
+--- Handle stream event
+---@param data table Event data
+function M._handle_stream(data)
+  local output = require("uranus.output")
+  if data.name == "stdout" then
+    output.display_text(data.text, "stdout")
+  elseif data.name == "stderr" then
+    output.display_text(data.text, "stderr")
+  end
 end
 
 --- Handle error event
 ---@param data table Event data
 function M._handle_error(data)
-  -- Log error and notify user
-  vim.notify("Uranus error: " .. (data.message or "Unknown error"), vim.log.levels.ERROR)
+  vim.notify("Jupyter protocol error: " .. (data.ename or "Unknown error"), vim.log.levels.ERROR)
+end
+
+--- Handle kernel info reply event
+---@param data table Event data
+function M._handle_kernel_info_reply(data)
+  local kernel = require("uranus.kernel")
+  if kernel.current_kernel then
+    kernel.current_kernel.language = data.language_info.name
+  end
 end
 
 --- Find backend binary path

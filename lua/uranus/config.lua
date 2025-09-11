@@ -45,8 +45,8 @@ function M.validate(config)
       local section_result = section.validator(section_config)
       if not section_result.success then
         return M.err("CONFIG_" .. section.key:upper(),
-          "Invalid " .. section.key .. " configuration: " .. section_result.error,
-          section_result.context)
+          "Invalid " .. section.key .. " configuration: " .. section_result.error.message,
+          section_result.error)
       end
       result[section.key] = section_result.data
     end

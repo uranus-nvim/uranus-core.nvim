@@ -98,31 +98,11 @@ function M.connect(server_name, kernel_name)
     return M.err("SERVER_NOT_FOUND", "Server '" .. server_name .. "' not found")
   end
 
-  -- Get available kernels from server
-  local kernels_result = M._list_server_kernels(server)
-  if not kernels_result.success then
-    return kernels_result
-  end
-
-  -- Find requested kernel
-  local kernel_info = nil
-  for _, kernel in ipairs(kernels_result.data) do
-    if kernel.name == kernel_name then
-      kernel_info = kernel
-      break
-    end
-  end
-
-  if not kernel_info then
-    return M.err("KERNEL_NOT_FOUND", "Kernel '" .. kernel_name .. "' not found on server '" .. server_name .. "'")
-  end
-
-  -- Connect via backend
+  -- Connect to remote kernel via backend
   local backend = require("uranus.backend")
-  local result = backend.send_command("connect_remote", {
-    server = server.url,
-    token = server.token,
-    kernel_id = kernel_info.id,
+  local result = backend.send_command("connect_remote_kernel", {
+    server = server,
+    kernel_name = kernel_name,
   })
 
   if not result.success then
@@ -148,20 +128,24 @@ end
 --- List all available remote kernels
 ---@return UranusResult<UranusRemoteKernel[]>
 function M.list_all_kernels()
-  local all_kernels = {}
+  local backend = require("uranus.backend")
+  local result = backend.send_command("list_remote_kernels", {
+    servers = M.servers
+  })
 
-  for _, server in ipairs(M.servers) do
-    local result = M._list_server_kernels(server)
-    if result.success then
-      for _, kernel in ipairs(result.data) do
-        table.insert(all_kernels, {
-          id = kernel.id,
-          name = kernel.name,
-          server = server,
-          status = kernel.status or "unknown",
-        })
-      end
-    end
+  if not result.success then
+    return result
+  end
+
+  -- Transform backend response to kernel objects
+  local all_kernels = {}
+  for _, kernel_data in ipairs(result.data.kernels or {}) do
+    table.insert(all_kernels, {
+      id = kernel_data.id,
+      name = kernel_data.name,
+      server = kernel_data.server,
+      status = kernel_data.status or "unknown",
+    })
   end
 
   return M.ok(all_kernels)
@@ -178,7 +162,7 @@ function M.disconnect(kernel_id)
 
   -- Disconnect via backend
   local backend = require("uranus.backend")
-  local result = backend.send_command("disconnect_remote", {
+  local result = backend.send_command("disconnect_remote_kernel", {
     kernel_id = kernel_id,
   })
 
@@ -190,49 +174,7 @@ function M.disconnect(kernel_id)
   return result
 end
 
---- Get server kernels via REST API
----@param server UranusRemoteServer Server configuration
----@return UranusResult<table[]> Server kernels
-function M._list_server_kernels(server)
-  -- Use plenary.curl for HTTP requests
-  local ok, curl = pcall(require, "plenary.curl")
-  if not ok then
-    return M.err("CURL_NOT_FOUND", "plenary.curl not found - required for remote kernels")
-  end
 
-  local url = server.url .. "/api/kernels"
-  local headers = {
-    ["Authorization"] = "token " .. server.token,
-  }
-
-  -- Add custom headers
-  if server.headers then
-    for k, v in pairs(server.headers) do
-      headers[k] = v
-    end
-  end
-
-  local response = curl.get(url, {
-    headers = headers,
-    timeout = M.config.remote.timeout or 10000,
-  })
-
-  if response.status ~= 200 then
-    return M.err("HTTP_ERROR", "Failed to list kernels: HTTP " .. response.status, {
-      url = url,
-      response = response.body,
-    })
-  end
-
-  local ok, kernels = pcall(vim.json.decode, response.body)
-  if not ok then
-    return M.err("PARSE_ERROR", "Failed to parse kernel list response", {
-      body = response.body,
-    })
-  end
-
-  return M.ok(kernels)
-end
 
 --- Validate server configuration
 ---@param server UranusRemoteServer Server to validate

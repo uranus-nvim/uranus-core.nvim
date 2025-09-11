@@ -179,22 +179,27 @@ function M.setup(opts)
   -- Merge user config with defaults
   M.config = vim.tbl_deep_extend("force", M.default_config, opts or {})
 
-  -- Initialize logger
-  M.logger = require("uranus.logger").new(M.config.log_level, M.config.debug)
-
-  -- Validate configuration
+  -- Validate configuration first
   local config_result = require("uranus.config").validate(M.config)
   if not config_result.success then
-    M.logger.error("Configuration validation failed: " .. config_result.error)
+    -- Create a basic logger for error reporting
+    local basic_logger = require("uranus.logger").new("ERROR", false)
+    basic_logger.error("Configuration validation failed: " .. config_result.error.message)
     return config_result
   end
+
+  -- Use validated config
+  M.config = config_result.data
+
+  -- Initialize logger with validated config
+  M.logger = require("uranus.logger").new(M.config.log_level or "INFO", M.config.debug)
 
   M.logger.info("Uranus v" .. M.version .. " initialized")
 
   -- Initialize components
   local init_result = M._initialize_components()
   if not init_result.success then
-    M.logger.error("Component initialization failed: " .. init_result.error)
+    M.logger.error("Component initialization failed: " .. init_result.error.message)
     return init_result
   end
 
@@ -216,8 +221,8 @@ function M._initialize_components()
   local components = {
     "logger",
     "config",
-    "kernel",
     "backend",
+    "kernel",
     "ui",
     "output",
     "repl",
@@ -234,7 +239,7 @@ function M._initialize_components()
       if type(module.init) == "function" then
         local result = module.init(M.config)
         if not result.success then
-          return M.err("INIT", "Failed to initialize " .. component .. ": " .. result.error)
+          return M.err("INIT", "Failed to initialize " .. component .. ": " .. result.error.message)
         end
       end
     end
