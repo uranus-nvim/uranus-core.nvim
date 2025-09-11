@@ -418,12 +418,18 @@ end
 function M._find_binary()
   -- Check common locations
   local candidates = {
-    -- Local development
-    vim.fn.getcwd() .. "/target/release/uranus-rs",
-    vim.fn.getcwd() .. "/target/debug/uranus-rs",
+    -- Local development (check both relative and absolute paths)
+    vim.fn.getcwd() .. "/uranus-rs/target/release/uranus-rs",
+    vim.fn.getcwd() .. "/uranus-rs/target/debug/uranus-rs",
+    vim.fn.expand("~/projects/uranus.nvim/uranus-rs/target/release/uranus-rs"),
+    vim.fn.expand("~/projects/uranus.nvim/uranus-rs/target/debug/uranus-rs"),
 
     -- User installation
     vim.fn.expand("~/.cargo/bin/uranus-rs"),
+
+    -- Prebuilt binaries (new)
+    vim.fn.expand("~/.local/share/uranus/bin/uranus-rs"),
+    vim.fn.expand("~/.config/uranus/bin/uranus-rs"),
 
     -- System installation
     "/usr/local/bin/uranus-rs",
@@ -435,8 +441,14 @@ function M._find_binary()
 
   for _, path in ipairs(candidates) do
     if vim.fn.executable(path) == 1 then
+      vim.notify("Found Uranus backend at: " .. path, vim.log.levels.DEBUG)
       return path
     end
+  end
+
+  vim.notify("Uranus backend binary not found. Please build with: cargo build --release", vim.log.levels.WARN)
+  return nil
+end
   end
 
   return nil
