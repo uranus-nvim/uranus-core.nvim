@@ -9,6 +9,13 @@
 local current_dir = vim.fn.fnamemodify(vim.fn.expand("<sfile>"), ":h:h")
 package.path = package.path .. ";" .. current_dir .. "/lua/?.lua"
 
+-- Add plenary.nvim from lazy directory
+local plenary_dir = vim.fn.stdpath("data") .. "/lazy/plenary.nvim"
+if vim.fn.isdirectory(plenary_dir) == 1 then
+  package.path = package.path .. ";" .. plenary_dir .. "/lua/?.lua"
+  package.path = package.path .. ";" .. plenary_dir .. "/lua/?/init.lua"
+end
+
 -- Disable unnecessary plugins and features for testing
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1

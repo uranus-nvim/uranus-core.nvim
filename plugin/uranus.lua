@@ -7,9 +7,9 @@
 --- @license MIT
 
 -- Early version check to prevent loading on incompatible Neovim versions
-if vim.version().minor < 11 or (vim.version().minor == 11 and vim.version().patch < 4) then
+if vim.version().minor < 11 or (vim.version().minor == 11 and vim.version().patch < 0) then
   vim.notify_once(
-    "Uranus requires Neovim 0.11.4+. Current version: " .. vim.version().major .. "." ..
+    "Uranus requires Neovim 0.11.0+. Current version: " .. vim.version().major .. "." ..
     vim.version().minor .. "." .. vim.version().patch,
     vim.log.levels.ERROR
   )
