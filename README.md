@@ -17,32 +17,24 @@
 
 ## ✨ Features
 
-Uranus.nvim provides **VSCode-like Jupyter integration** with two powerful modes:
+Uranus.nvim provides **experimental Jupyter kernel integration** with foundational capabilities:
 
-### 🔬 REPL / Cell Mode
-- **Cell execution** with `#%%` markers (configurable)
-- **Interactive execution** of code selections
-- **Rich output display** in floating windows, virtual text, or terminal
-- **Multi-language support** (Python, R, Julia, etc.)
+### 🔬 REPL / Cell Mode (In Development)
+- **Cell marker parsing** with `#%%` markers (basic implementation)
+- **Interactive execution** of code selections (foundation in place)
+- **Basic output display** (currently simulating output for development)
+- **Single language support** (Python-focused development)
 
-### 📓 Notebook Mode
-- **Rendered notebooks** with interleaved code + outputs
-- **Live markdown preview** with images, tables, and LaTeX
-- **Multiple renderers** (markview, render-markdown)
-- **Export capabilities** to various formats
+### 🌐 Kernel Management (Foundation)
+- **Local kernel discovery** via Jupyter runtime (using runtimelib)
+- **Kernel connection management** (basic implementation)
+- **Process-based kernel control** (start/stop)
 
-### 🌐 Kernel Management
-- **Local kernels** via Jupyter runtime discovery
-- **Remote kernels** via JupyterHub/JupyterLab
-- **WebSocket streaming** for real-time output
-- **Telescope integration** for kernel selection
-
-### 🎨 Rich Output Support
-- **Images** rendered with `snacks.nvim`
-- **HTML/Markdown** in floating windows
-- **Tables** with syntax highlighting
-- **LaTeX/MathJax** rendering
-- **Interactive plots** and visualizations
+### 🔧 Development Features
+- **Msgpack-RPC communication** between Lua and Rust
+- **Configuration system** with validation
+- **Command interface** for kernel operations
+- **Status reporting** and error handling
 
 ---
 
@@ -73,118 +65,52 @@ Uranus.nvim provides **VSCode-like Jupyter integration** with two powerful modes
 ---
 
 ## 🚀 Quick Start
-## 📖 Usage Guide
+## 📖 Usage Guide (Development Preview)
 
-### REPL / Cell Mode
+### Basic Operations
+The current implementation provides foundational kernel management and execution capabilities:
 
-#### Cell Markers
-Mark cells using configurable separators:
-
-```python
-# %% Data Loading
-import pandas as pd
-data = pd.read_csv("data.csv")
-
-# %% Analysis
-result = data.describe()
-
-# %% Visualization
-import matplotlib.pyplot as plt
-plt.plot(data.x, data.y)
-plt.show()
+#### Starting the Backend
+```vim
+:UranusStart
 ```
 
-#### Keymaps
-```lua
--- Cell operations
-vim.keymap.set("n", "<leader>rc", require("uranus.repl").run_cell)
-vim.keymap.set("n", "<leader>ra", require("uranus.repl").run_all)
-vim.keymap.set("n", "<leader>rs", require("uranus.repl").run_selection)
-vim.keymap.set("n", "<leader>rp", require("uranus.repl").run_to_cursor)
-
--- Navigation
-vim.keymap.set("n", "<leader>rj", require("uranus.repl").next_cell)
-vim.keymap.set("n", "<leader>rk", require("uranus.repl").prev_cell)
+#### Checking Status
+```vim
+:UranusStatus
 ```
 
-#### Output Display Options
-
-**Floating Windows** (default):
-- Rich formatting with borders
-- Scrollable content
-- Auto-positioning
-
-**Virtual Text**:
-- Inline output under code
-- Compact display
-- Less intrusive
-
-**Terminal/Tmux**:
-- External terminal integration
-- Persistent output
-- Better for long-running tasks
-
-### Notebook Mode
-
-#### Creating Notebooks
-```lua
--- Convert current buffer to notebook
-:lua require("uranus.notebook").create()
-
--- Open notebook from file
-:lua require("uranus.notebook").open("notebook.ipynb")
+#### Listing Available Kernels
+```vim
+:UranusListKernels
 ```
 
-#### Notebook Features
-- **Interleaved display**: Code blocks with rendered outputs
-- **Live updates**: Automatic re-rendering on execution
-- **Multiple formats**: Support for images, tables, LaTeX
-- **Export options**: Convert to various formats
-
-Example notebook display:
-````markdown
-```python
-# Data analysis cell
-import pandas as pd
-data = pd.read_csv("sales.csv")
-print(data.head())
+#### Connecting to a Kernel
+```vim
+:UranusConnect python3
 ```
 
-```
-   date  sales  region
-0  2023-01-01   1000   North
-1  2023-01-02   1200   South
-2  2023-01-03    800   East
+#### Executing Code
+```vim
+:UranusExecute print("Hello, World!")
 ```
 
-```python
-# Visualization cell
-import matplotlib.pyplot as plt
-plt.bar(data.region, data.sales)
-plt.title("Sales by Region")
-plt.show()
+#### Stopping the Backend
+```vim
+:UranusStop
 ```
 
-![Sales Chart](temp_chart.png)
-````
+### Current Limitations (Development Stage)
+Please note that this is an active development version with the following limitations:
 
-### Remote Kernel Management
+- **Kernel Communication**: Currently simulating Jupyter protocol interactions (planned enhancement)
+- **Code Execution**: Basic execution simulation (planned enhancement with real jupyter-protocol)
+- **Output Display**: Limited to basic notifications (planned enhancement with virtual text/floating windows)
+- **Cell Parsing**: Not yet implemented (planned enhancement with extmarks)
+- **Notebook Mode**: Not yet implemented (planned enhancement)
+- **Remote Kernels**: Not yet implemented (planned enhancement with jupyter-websocket-client)
 
-#### Connecting to Remote Servers
-```lua
--- Add remote server
-require("uranus.remote").add_server({
-  name = "work-cluster",
-  url = "https://jupyter.company.com:8443",
-  token = "your-jupyter-token",
-  headers = {
-    ["X-Custom-Header"] = "value",
-  },
-})
-
--- Connect to remote kernel
-require("uranus.remote").connect("work-cluster", "python3")
-```
+These features are actively being developed to provide a complete Jupyter kernel integration experience.
 
 ---
 
@@ -275,25 +201,34 @@ remote.disconnect()                      -- Disconnect remote
         └─────────────────┬───────────────────┘
                           │ Msgpack-RPC Protocol
         ┌─────────────────▼───────────────────┐
-        │         Uranus Backend              │
-        │  (runtimelib, jupyter-protocol,     │
-        │   jupyter-websocket-client, nbformat)│
+        │         Uranus Backend (Rust)        │
+        │                                     │
         └─────────────────┬───────────────────┘
            ┌──────────────┴──────────────┐
            │                             │
 ┌──────────▼─────────┐        ┌──────────▼─────────┐
-│   Local Kernel     │        │   Remote Kernel    │
-│ (runtimelib +      │        │(jupyter-websocket-│
-│  jupyter-protocol) │        │     client)        │
+│   Local Kernel     │        │   Remote Kernel  │
+│   (ZeroMQ)         │        │   (WebSocket)    │
 └────────────────────┘        └────────────────────┘
 ```
 
+### Foundation Libraries
+
+Uranus is built on these battle-tested Rust crates:
+
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| [runtimelib](https://docs.rs/runtimelib/1.5.0) | 1.5 | Jupyter kernel discovery, start, and management over ZeroMQ |
+| [jupyter-protocol](https://docs.rs/jupyter-protocol/1.4.0) | 1.4 | Complete Jupyter messaging protocol implementation |
+| [nbformat](https://docs.rs/nbformat/1.2.2) | 1.2 | Jupyter notebook parsing and serialization |
+| [tokio](https://crates.io/crates/tokio) | 1 | Async runtime for non-blocking kernel communication |
+
 ### Component Responsibilities
 
-- **Lua Frontend**: UI, cell parsing, output rendering, user interaction
-- **Rust Backend**: Kernel discovery and management with `runtimelib`, communication via `jupyter-protocol` and `jupyter-websocket-client`, protocol handling, performance-critical operations, notebook parsing with `nbformat`
-- **Local Kernels**: Kernel discovery with `runtimelib`, direct ZMQ connection using `jupyter-protocol` for message exchange
-- **Remote Kernels**: WebSocket streaming via JupyterHub/JupyterLab using `jupyter-websocket-client`
+- **Lua Frontend**: UI, cell parsing with extmarks, output rendering (virtual text, floating windows)
+- **Rust Backend**: Kernel management, code execution, protocol handling via runtimelib + jupyter-protocol
+- **Local Kernels**: ZeroMQ connection using runtimelib for direct kernel communication
+- **Remote Kernels**: WebSocket streaming via JupyterHub/JupyterLab
 
 ### Msgpack-RPC Protocol
 
