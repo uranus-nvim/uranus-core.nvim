@@ -7,7 +7,17 @@
 
 -- Set up package path for local development
 local current_dir = vim.fn.fnamemodify(vim.fn.expand("<sfile>"), ":h:h")
-package.path = package.path .. ";" .. current_dir .. "/lua/?.lua"
+local lua_dir = current_dir .. "/lua"
+
+-- Add lua directory to package.path explicitly
+package.path = package.path .. ";" .. lua_dir .. "/?.lua"
+package.path = package.path .. ";" .. lua_dir .. "/?/init.lua"
+
+-- Also add to runtimepath
+vim.opt.runtimepath:prepend(current_dir)
+
+-- Load the uranus Rust module via rplugin
+-- The compiled library should be loaded automatically by Neovim's remote plugin system
 
 -- Add plenary.nvim from lazy directory
 local plenary_dir = vim.fn.stdpath("data") .. "/lazy/plenary.nvim"
