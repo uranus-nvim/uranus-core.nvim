@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install luacheck
-        uses: mhhennig/github-actions-luacheck@v2
+        uses: lunarmodules/luacheck@v1
         with:
           args: --config .luacheckrc .
 
