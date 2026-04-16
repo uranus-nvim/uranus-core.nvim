@@ -28,7 +28,9 @@ jobs:
 uses: dtolnay/rust-toolchain@stable
 with:
   toolchain: ${{ matrix.rust }}
-  components: rustfmt
+
+- name: Install rustfmt
+run: rustup component add rustfmt
 
 - name: Cache cargo registry
 uses: Swatinem/rust-cache@v2
