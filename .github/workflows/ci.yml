@@ -52,22 +52,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Lua
-        uses: leafo/gh-actions-lua@v10
-        with:
-          luaVersion: "5.1"
-
       - name: Install luacheck
-        run: luarocks install luacheck
-
-      - name: Run luacheck
-        run: luacheck --config .luacheckrc .
+        uses: mhhennig/github-actions-luacheck@v2
+        with:
+          args: --config .luacheckrc .
 
       - name: Install StyLua
-        run: luarocks install stylua
-
-      - name: Check Lua formatting
-        run: stylua --check lua/ tests/
+        uses:JohnnyMorganz/StyLua-Action@v2
+        with:
+          args: --check lua/ tests/
 
   pre-commit:
     name: Pre-commit
