@@ -6,6 +6,89 @@
 --- @module plugin.uranus
 --- @license MIT
 
+local M = {
+  name = "uranus.nvim",
+  version = "0.1.0",
+  description = "Jupyter kernel integration for Neovim",
+}
+
+--- Download prebuilt binary from GitHub releases
+function M._download_prebuilt()
+  local os = vim.loop.os_uname().sysname
+  local arch = vim.loop.os_uname().machine
+
+  local ext = (os == "Darwin" and "dylib" or "so")
+
+  -- Find plugin directory (works with lazy.nvim, packer, etc.)
+  local plugin_root = vim.fn.stdpath("config") .. "/plugins/uranus-core.nvim"
+  if vim.fn.isdirectory(vim.fn.stdpath("data") .. "/lazy/uranus-core.nvim") == 1 then
+    plugin_root = vim.fn.stdpath("data") .. "/lazy/uranus-core.nvim"
+  elseif vim.fn.isdirectory(vim.fn.stdpath("data") .. "/site/pack/vendor/start/uranus-core.nvim") == 1 then
+    plugin_root = vim.fn.stdpath("data") .. "/site/pack/vendor/start/uranus-core.nvim"
+  end
+
+  local dest_path = plugin_root .. "/lua/uranus.so"
+
+  if vim.fn.filereadable(dest_path) == 1 then
+    return true
+  end
+
+  local platform
+  if os == "Darwin" then
+    platform = (arch == "arm64" and "macos-arm64" or "macos-x64")
+  else
+    platform = "linux-x64"
+  end
+
+  local url = string.format(
+    "https://github.com/yourname/uranus-core.nvim/releases/latest/download/%s-uranus.so",
+    platform
+  )
+
+  vim.notify("Downloading Uranus prebuilt binary...", vim.log.levels.INFO)
+
+  local cmd = string.format(
+    "curl -L -o '%s' '%s' 2>&1",
+    dest_path, url
+  )
+
+  local handle = io.popen(cmd)
+  if not handle then
+    return false
+  end
+
+  local output = handle:read("*a")
+  local success = handle:close()
+
+  if success then
+    os.execute("chmod +x " .. dest_path)
+    vim.notify("Uranus prebuilt downloaded!", vim.log.levels.INFO)
+    return true
+  else
+    vim.notify("Download failed: " .. output, vim.log.levels.ERROR)
+    return false
+  end
+end
+
+--- Check if backend binary exists, try to download if not
+function M._ensure_backend()
+  -- Find plugin directory
+  local plugin_root = vim.fn.stdpath("config") .. "/plugins/uranus-core.nvim"
+  if vim.fn.isdirectory(vim.fn.stdpath("data") .. "/lazy/uranus-core.nvim") == 1 then
+    plugin_root = vim.fn.stdpath("data") .. "/lazy/uranus-core.nvim"
+  elseif vim.fn.isdirectory(vim.fn.stdpath("data") .. "/site/pack/vendor/start/uranus-core.nvim") == 1 then
+    plugin_root = vim.fn.stdpath("data") .. "/site/pack/vendor/start/uranus-core.nvim"
+  end
+
+  local so_path = plugin_root .. "/lua/uranus.so"
+
+  if vim.fn.filereadable(so_path) ~= 1 then
+    return M._download_prebuilt()
+  end
+
+  return true
+end
+
 -- Early version check to prevent loading on incompatible Neovim versions
 if vim.version().minor < 11 or (vim.version().minor == 11 and vim.version().patch < 0) then
   vim.notify_once(
@@ -20,13 +103,6 @@ end
 if vim.loader then
   vim.loader.enable()
 end
-
--- Plugin metadata
-local M = {
-  name = "uranus.nvim",
-  version = "0.1.0",
-  description = "Jupyter kernel integration for Neovim",
-}
 
 --- Check for Jupyter and optionally install
 function M._check_jupyter()
@@ -53,24 +129,25 @@ end
 
 function M._install_jupyter()
   local notify = vim.notify or print
-  notify("Installing Jupyter...", vim.log.levels.INFO)
 
-  local handle = io.popen("pip3 install jupyter notebook ipykernel 2>&1")
-  if not handle then
-    notify("Failed to install Jupyter: could not run pip3", vim.log.levels.ERROR)
-    return false
-  end
+  local jupyter_installer = require("jupyter_installer")
 
-  local output = handle:read("*a")
-  local success = handle:close()
-
-  if success then
-    notify("Jupyter installed successfully!", vim.log.levels.INFO)
+  if jupyter_installer.check_jupyter() then
+    notify("Jupyter is already installed!", vim.log.levels.INFO)
     return true
-  else
-    notify("Failed to install Jupyter: " .. output, vim.log.levels.ERROR)
-    return false
   end
+
+  jupyter_installer.show_install_dialog(function(ok, result)
+    if ok then
+      vim.defer_fn(function()
+        if M._check_jupyter() then
+          notify("Jupyter installation verified!", vim.log.levels.INFO)
+        end
+      end, 1000)
+    end
+  end)
+
+  return false
 end
 
 function M._ensure_jupyter()
@@ -98,6 +175,12 @@ end
 --- Lazy initialization function
 --- Called when the plugin should be fully loaded
 function M._lazy_init()
+  -- Ensure backend binary exists (download if needed)
+  if not M._ensure_backend() then
+    vim.notify("Uranus: Failed to get backend binary. Build from source or check network.", vim.log.levels.ERROR)
+    return
+  end
+
   -- Check for Jupyter and optionally install
   if not M._check_jupyter() then
     M._ensure_jupyter()
@@ -1125,6 +1208,124 @@ vim.api.nvim_create_user_command("UranusNotebookUITreesitter", function()
     vim.notify("Treesitter not available", vim.log.levels.ERROR)
   end
 end, { desc = "Enable treesitter for notebook" })
+
+-- Kernel Manager commands
+vim.api.nvim_create_user_command("UranusInstallKernel", function(opts)
+  local km = require("uranus.kernel_manager")
+  local kernel_name = opts.args ~= "" and opts.args or nil
+  if kernel_name then
+    km.install_kernel(kernel_name, function(success, err)
+      if success then
+        vim.notify("Kernel installed: " .. kernel_name, vim.log.levels.INFO)
+      else
+        vim.notify("Failed to install kernel: " .. (err or "unknown"), vim.log.levels.ERROR)
+      end
+    end)
+  else
+    local env = km.get_python_env()
+    local name = env.prefix ~= "" and env.name or "python3"
+    vim.ui.select({"Current Environment (" .. name .. ")", "Custom..."}, {
+      prompt = "Install kernel for:",
+    }, function(choice)
+      if choice == "Current Environment (" .. name .. ")" then
+        km.install_kernel(name, function(success, err)
+          if success then
+            vim.notify("Kernel installed: " .. name, vim.log.levels.INFO)
+          else
+            vim.notify("Failed: " .. (err or "unknown"), vim.log.levels.ERROR)
+          end
+        end)
+      elseif choice == "Custom..." then
+        vim.ui.input({ prompt = "Kernel name: " }, function(input)
+          if input and #input > 0 then
+            km.install_kernel(input, function(success, err)
+              if success then
+                vim.notify("Kernel installed: " .. input, vim.log.levels.INFO)
+              else
+                vim.notify("Failed: " .. (err or "unknown"), vim.log.levels.ERROR)
+              end
+            end)
+          end
+        end)
+      end
+    end)
+  end
+end, {
+  desc = "Install Jupyter kernel (VS Code-like)",
+  nargs = "?",
+})
+
+vim.api.nvim_create_user_command("UranusListKernels", function()
+  local km = require("uranus.kernel_manager")
+  local kernels = km.list_kernels()
+  if #kernels == 0 then
+    vim.notify("No kernels found. Run :UranusInstallKernel to create one.", vim.log.levels.WARN)
+    return
+  end
+
+  local lines = { "Available Jupyter kernels:" }
+  for _, k in ipairs(kernels) do
+    table.insert(lines, string.format("  - %s (%s) [%s]", k.name, k.display_name, k.language))
+  end
+
+  vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+end, { desc = "List available Jupyter kernels" })
+
+vim.api.nvim_create_user_command("UranusRemoveKernel", function(opts)
+  local km = require("uranus.kernel_manager")
+  local kernel_name = opts.args
+
+  if kernel_name == "" then
+    local kernels = km.list_kernels()
+    if #kernels == 0 then
+      vim.notify("No kernels to remove", vim.log.levels.WARN)
+      return
+    end
+
+    local names = {}
+    for _, k in ipairs(kernels) do
+      table.insert(names, k.name)
+    end
+
+    vim.ui.select(names, {
+      prompt = "Select kernel to remove:",
+    }, function(choice)
+      if choice then
+        km.remove_kernel(choice, function(success, err)
+          if success then
+            vim.notify("Kernel removed: " .. choice, vim.log.levels.INFO)
+          else
+            vim.notify("Failed: " .. (err or "unknown"), vim.log.levels.ERROR)
+          end
+        end)
+      end
+    end)
+  else
+    km.remove_kernel(kernel_name, function(success, err)
+      if success then
+        vim.notify("Kernel removed: " .. kernel_name, vim.log.levels.INFO)
+      else
+        vim.notify("Failed: " .. (err or "unknown"), vim.log.levels.ERROR)
+      end
+    end)
+  end
+end, {
+  desc = "Remove a Jupyter kernel",
+  nargs = "?",
+  complete = function()
+    local km = require("uranus.kernel_manager")
+    local kernels = km.list_kernels()
+    local names = {}
+    for _, k in ipairs(kernels) do
+      table.insert(names, k.name)
+    end
+    return names
+  end,
+})
+
+vim.keymap.set("n", "<leader>uki", ":UranusInstallKernel<cr>", { desc = "Install kernel" })
+vim.keymap.set("n", "<leader>ukl", ":UranusListKernels<cr>", { desc = "List kernels" })
+vim.keymap.set("n", "<leader>ukr", ":UranusRemoveKernel<cr>", { desc = "Remove kernel" })
 
 -- Error handling - graceful degradation
 local function setup_error_handling()

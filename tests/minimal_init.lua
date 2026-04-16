@@ -8,10 +8,13 @@
 -- Set up package path for local development
 local current_dir = vim.fn.fnamemodify(vim.fn.expand("<sfile>"), ":h:h")
 local lua_dir = current_dir .. "/lua"
+local plugin_dir = current_dir .. "/plugin"
 
 -- Add lua directory to package.path explicitly
 package.path = package.path .. ";" .. lua_dir .. "/?.lua"
 package.path = package.path .. ";" .. lua_dir .. "/?/init.lua"
+package.path = package.path .. ";" .. plugin_dir .. "/?.lua"
+package.path = package.path .. ";" .. plugin_dir .. "/?/init.lua"
 
 -- Also add to runtimepath
 vim.opt.runtimepath:prepend(current_dir)

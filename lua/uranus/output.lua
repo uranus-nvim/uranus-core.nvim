@@ -5,14 +5,22 @@
 
 local M = {}
 
-local config = {
-  enable_virtual_text = true,
-  enable_snacks = true,
-  max_output_lines = 1000,
-  virtual_text_prefix = " => ",
-  error_prefix = " => Error: ",
-  batch_delay = 10,
-}
+local config = nil
+
+local function get_config()
+  if not config then
+    local cfg = require("uranus.config")
+    local defaults = cfg.get("output") or {}
+    config = vim.deepcopy(defaults)
+    config.enable_virtual_text = true
+    config.enable_snacks = true
+    config.max_output_lines = 1000
+    config.virtual_text_prefix = " => "
+    config.error_prefix = " => Error: "
+    config.batch_delay = 10
+  end
+  return config
+end
 
 local ns_virtual_text = vim.api.nvim_create_namespace("uranus_output_virtual")
 local ns_highlight = vim.api.nvim_create_namespace("uranus_output_highlight")
@@ -27,11 +35,13 @@ local function setup()
 end
 
 function M.configure(opts)
-  config = vim.tbl_deep_extend("force", config, opts or {})
+  local cfg = require("uranus.config")
+  local current = cfg.get("output") or {}
+  config = vim.tbl_deep_extend("force", current, opts or {})
 end
 
 function M.get_config()
-  return config
+  return get_config()
 end
 
 local function flush_batch()
@@ -89,6 +99,8 @@ function M.clear_all_virtual_text(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   vim.api.nvim_buf_clear_namespace(bufnr, ns_virtual_text, 0, -1)
 end
+
+M.clear = M.clear_all_virtual_text
 
 function M.flush()
   if batch_timer then

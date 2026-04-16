@@ -1,0 +1,22 @@
+* text=auto eol=lf
+
+# Binary files
+*.so binary
+*.dylib binary
+*.dll binary
+*.exe binary
+
+# Lua
+*.lua text eol=lf
+
+# Rust
+*.rs text eol=lf
+
+# Config
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+
+# Docs
+*.md text eol=lf

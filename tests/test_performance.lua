@@ -1,61 +1,42 @@
 --- Performance optimization tests
----
 --- Tests for performance optimizations in Uranus modules
----
---- @module tests.test_performance
+--- Uses shared test framework
+
+package.path = package.path .. ";./tests/?.lua"
+local T = require("testlib")
+T.reset()
 
 local function run_performance_tests()
-  local tests_passed = 0
-  local tests_failed = 0
-  local tests_skipped = 0
-  
-  local function test(name, fn)
-    local ok, err = pcall(fn)
-    if ok then
-      print("[PASS] " .. name)
-      tests_passed = tests_passed + 1
-    else
-      print("[FAIL] " .. name .. ": " .. tostring(err))
-      tests_failed = tests_failed + 1
-    end
-  end
-  
-  local function skip(name, reason)
-    print("[SKIP] " .. name .. " (" .. reason .. ")")
-    tests_skipped = tests_skipped + 1
-  end
-  
-  print("\n=== Performance Optimization Tests ===\n")
-  
-  -- Test 1: vim.loader enabled
-  test("vim.loader enabled", function()
-    local enabled = vim.loader and true or false
-    assert(enabled, "vim.loader should be available")
+  T.section("Performance Optimization Tests")
+
+  T.section("vim.loader")
+  T.test("vim.loader enabled", function()
+    T.assert(vim.loader ~= nil, "vim.loader should be available")
   end)
-  
-  -- Test 2: Cache module - O(1) LRU
-  test("Cache module loads", function()
+
+  T.section("Cache Module - O(1) LRU")
+  T.test("Cache module loads", function()
     local ok, cache = pcall(require, "uranus.cache")
-    assert(ok, "Failed to load cache module")
+    T.assert(ok, "Failed to load cache module")
   end)
-  
-  test("Cache basic operations", function()
+
+  T.test("Cache basic operations", function()
     local cache = require("uranus.cache")
     cache.set("test_key", "test_value")
     local val = cache.get("test_key")
-    assert(val == "test_value", "Failed to get cached value")
+    T.assert_eq(val, "test_value")
     cache.invalidate("test_key")
   end)
-  
-  test("Cache TTL expiration", function()
+
+  T.test("Cache TTL expiration", function()
     local cache = require("uranus.cache")
-    cache.set("ttl_key", "value", 10) -- 10ms TTL
+    cache.set("ttl_key", "value", 10)
     vim.wait(20)
     local val = cache.get("ttl_key")
-    assert(val == nil, "TTL should have expired")
+    T.assert_nil(val, "TTL should have expired")
   end)
-  
-  test("Cache max size enforcement", function()
+
+  T.test("Cache max size enforcement", function()
     local cache = require("uranus.cache")
     cache.clear()
     cache.configure({ max_size = 5 })
@@ -63,182 +44,253 @@ local function run_performance_tests()
       cache.set("key" .. i, "value" .. i)
     end
     local count = cache.size()
-    cache.configure({ max_size = 100 }) -- reset
-    assert(count <= 6, "Cache size check works (got " .. count .. ")")
+    cache.configure({ max_size = 100 })
+    T.assert(count <= 6, "Cache should respect max_size")
   end)
-  
-  test("Cache clear", function()
+
+  T.test("Cache clear", function()
     local cache = require("uranus.cache")
     cache.set("clear_key", "clear_value")
     cache.clear()
     local val = cache.get("clear_key")
-    assert(val == nil, "Cache should be cleared")
+    T.assert_nil(val, "Cache should be cleared")
   end)
-  
-  -- Test 3: LSP module caches
-  test("LSP module loads", function()
+
+  T.section("Cache Stats")
+  T.test("Cache size function", function()
+    local cache = require("uranus.cache")
+    cache.clear()
+    cache.set("size_k", "size_v")
+    local size = cache.size()
+    T.assert(size >= 1, "Cache size should be >= 1")
+    cache.clear()
+  end)
+
+  T.test("Cache stats function", function()
+    local cache = require("uranus.cache")
+    local stats = cache.stats()
+    T.assert_type(stats, "table")
+  end)
+
+  T.section("LSP Module Caches")
+  T.test("LSP module loads", function()
     local ok, lsp = pcall(require, "uranus.lsp")
-    assert(ok, "Failed to load LSP module")
+    T.assert(ok, "Failed to load LSP module")
   end)
-  
-  test("LSP status function", function()
+
+  T.test("LSP status function", function()
     local lsp = require("uranus.lsp")
     local status = lsp.status()
-    assert(type(status) == "table", "status should return table")
+    T.assert_type(status, "table")
   end)
-  
-  test("LSP is_available function", function()
+
+  T.test("LSP is_available function", function()
     local lsp = require("uranus.lsp")
     local available = lsp.is_available()
-    assert(type(available) == "boolean", "is_available should return boolean")
+    T.assert_type(available, "boolean")
   end)
-  
-  test("LSP get_clients function", function()
+
+  T.test("LSP get_clients function", function()
     local lsp = require("uranus.lsp")
     local clients = lsp.get_clients()
-    assert(type(clients) == "table", "get_clients should return table")
+    T.assert_type(clients, "table")
   end)
-  
-  test("LSP configure function", function()
+
+  T.test("LSP configure function", function()
     local lsp = require("uranus.lsp")
     local original = lsp.get_config()
     lsp.configure({ timeout = 3000 })
     local modified = lsp.get_config()
-    assert(modified.timeout == 3000, "configure should update settings")
+    T.assert_eq(modified.timeout, 3000)
     lsp.configure({ timeout = original.timeout })
   end)
-  
-  test("LSP client caching enabled", function()
+
+  T.test("LSP client caching enabled", function()
     local lsp = require("uranus.lsp")
     lsp.get_clients()
     lsp.get_clients()
-    assert(true, "Client caching works")
+    T.assert(true, "Client caching works")
   end)
-  
-  test("LSP request throttling", function()
+
+  T.test("LSP request throttling", function()
     local lsp = require("uranus.lsp")
-    assert(type(lsp.get_diagnostics) == "function", "Request throttling configured")
+    T.assert_type(lsp.get_diagnostics, "function")
   end)
-  
-  -- Test 4: REPL module caches
-  test("REPL module loads", function()
+
+  T.section("REPL Module Caches")
+  T.test("REPL module loads", function()
     local ok, repl = pcall(require, "uranus.repl")
-    assert(ok, "Failed to load REPL module")
+    T.assert(ok, "Failed to load REPL module")
   end)
-  
-  test("REPL cell parsing cache", function()
+
+  T.test("REPL cell parsing cache", function()
     local repl = require("uranus.repl")
-    assert(type(repl.parse_cells) == "function", "Cell parsing cache is implemented")
+    T.assert_type(repl.parse_cells, "function")
   end)
-  
-  test("REPL get_config function", function()
+
+  T.test("REPL get_config function", function()
     local repl = require("uranus.repl")
     local cfg = repl.get_config()
-    assert(type(cfg) == "table", "get_config should return table")
+    T.assert_type(cfg, "table")
   end)
-  
-  -- Test 5: Output module batch processing
-  test("Output module loads", function()
+
+  T.section("Output Module Batch Processing")
+  T.test("Output module loads", function()
     local ok, output = pcall(require, "uranus.output")
-    assert(ok, "Failed to load output module")
+    T.assert(ok, "Failed to load output module")
   end)
-  
-  test("Output batch processing enabled", function()
+
+  T.test("Output batch processing enabled", function()
     local output = require("uranus.output")
     local cfg = output.get_config()
-    assert(cfg.batch_delay > 0, "Batch processing should be enabled")
+    T.assert(cfg.batch_delay > 0, "Batch processing should be enabled")
   end)
-  
-  test("Output flush function", function()
+
+  T.test("Output flush function", function()
     local output = require("uranus.output")
-    assert(type(output.flush) == "function", "flush function should exist")
+    T.assert_type(output.flush, "function")
   end)
-  
-  test("Output snacks detection", function()
+
+  T.test("Output snacks detection", function()
     local output = require("uranus.output")
-    assert(type(output.display) == "function", "Output display function exists")
+    T.assert_type(output.display, "function")
   end)
-  
-  -- Test 6: Inspector module caches
-  test("Inspector module loads", function()
+
+  T.section("Inspector Module Caches")
+  T.test("Inspector module loads", function()
     local ok, inspector = pcall(require, "uranus.inspector")
-    assert(ok, "Failed to load inspector module")
+    T.assert(ok, "Failed to load inspector module")
   end)
-  
-  test("Inspector variables cache", function()
+
+  T.test("Inspector variables cache", function()
     local inspector = require("uranus.inspector")
-    assert(type(inspector.get_variables) == "function", "Variables cache is implemented")
+    T.assert_type(inspector.get_variables, "function")
   end)
-  
-  test("Inspector hover debounce", function()
+
+  T.test("Inspector hover debounce", function()
     local inspector = require("uranus.inspector")
-    assert(type(inspector.inspect_at_cursor) == "function", "Hover inspection is implemented")
+    T.assert_type(inspector.inspect_at_cursor, "function")
   end)
-  
-  -- Test 7: Notebook module cache invalidation
-  test("Notebook module loads", function()
+
+  T.section("Notebook Module Cache")
+  T.test("Notebook module loads", function()
     local ok, notebook = pcall(require, "uranus.notebook")
-    assert(ok, "Failed to load notebook module")
+    T.assert(ok, "Failed to load notebook module")
   end)
-  
-  test("Notebook cache invalidation API", function()
+
+  T.test("Notebook cache invalidation API", function()
     local notebook = require("uranus.notebook")
-    assert(type(notebook.invalidate_cache) == "function", "invalidate_cache should exist")
+    T.assert_type(notebook.invalidate_cache, "function")
   end)
-  
-  -- Test 8: Cache module memoization
-  test("Cache memoization utility", function()
+
+  T.section("Cache Module Memoization")
+  T.test("Cache memoization utility", function()
     local cache = require("uranus.cache")
     local call_count = 0
     local fn = cache.memoize(function()
       call_count = call_count + 1
       return "computed"
     end, 100)
-    
+
     for _ = 1, 5 do
       fn()
     end
-    
-    assert(call_count == 1, "memoize should only call function once (got " .. call_count .. ")")
+
+    T.assert_eq(call_count, 1, "memoize should only call function once")
   end)
-  
-  -- Test 9: Timing tests
-  test("Cache get performance (< 1ms)", function()
+
+  T.section("Timing Tests")
+  T.test("Cache get performance (< 1ms)", function()
     local cache = require("uranus.cache")
     cache.clear()
     cache.set("perf_key", "perf_value")
-    
+
     local start = vim.loop.now()
     for _ = 1, 1000 do
       cache.get("perf_key")
     end
     local elapsed = vim.loop.now() - start
-    
-    assert(elapsed < 1000, "1000 cache gets should take < 1000ms (took " .. elapsed .. "ms)")
+
+    T.assert(elapsed < 1000, "1000 cache gets should take < 1000ms")
   end)
-  
-  test("LSP client lookup performance (< 5ms)", function()
+
+  T.test("LSP client lookup performance (< 5ms)", function()
     local lsp = require("uranus.lsp")
-    
+
     local start = vim.loop.now()
     for _ = 1, 100 do
       lsp.get_clients()
     end
     local elapsed = vim.loop.now() - start
-    
-    assert(elapsed < 500, "100 client lookups should take < 500ms (took " .. elapsed .. "ms)")
+
+    T.assert(elapsed < 500, "100 client lookups should take < 500ms")
   end)
-  
-  -- Summary
-  print("\n=== Results ===")
-  print(string.format("Passed: %d", tests_passed))
-  print(string.format("Failed: %d", tests_failed))
-  print(string.format("Skipped: %d", tests_skipped))
-  print(string.format("Total: %d", tests_passed + tests_failed + tests_skipped))
-  
-  return tests_failed == 0
+
+  T.section("Optional: Batch Module")
+  T.test("Output batch module loads", function()
+    local ok, batch = pcall(require, "uranus.output_batch")
+    if ok then
+      T.assert_type(batch.add, "function")
+    else
+      T.skip("output_batch not available", "optional")
+    end
+  end)
+
+  T.test("Output batch interval", function()
+    local ok, batch = pcall(require, "uranus.output_batch")
+    if ok then
+      local cfg = batch.get_config and batch.get_config() or {}
+      T.assert_type(cfg, "table")
+    else
+      T.skip("output_batch not available", "optional")
+    end
+  end)
+
+  T.section("Optional: Parallel Module")
+  T.test("Parallel module loads", function()
+    local ok, parallel = pcall(require, "uranus.parallel")
+    if ok then
+      T.assert_type(parallel.map, "function")
+    else
+      T.skip("parallel not available", "optional")
+    end
+  end)
+
+  T.test("Parallel workers config", function()
+    local ok, parallel = pcall(require, "uranus.parallel")
+    if ok then
+      local workers = parallel.workers and parallel.workers() or 4
+      T.assert_type(workers, "number")
+    else
+      T.skip("parallel not available", "optional")
+    end
+  end)
+
+  T.section("Optional: Optimize Module")
+  T.test("Optimize module loads", function()
+    local ok, optimize = pcall(require, "uranus.optimize")
+    if ok then
+      T.assert(optimize ~= nil)
+    else
+      T.skip("optimize not available", "optional")
+    end
+  end)
+
+  T.test("Optimize string interning", function()
+    local ok, optimize = pcall(require, "uranus.optimize")
+    if ok and optimize.intern then
+      local s1 = optimize.intern("test_string")
+      local s2 = optimize.intern("test_string")
+      T.assert_eq(s1, s2, "Interned strings should be equal")
+    else
+      T.skip("optimize.intern not available", "optional")
+    end
+  end)
+
+  T.summary()
+
+  return T.results()
 end
 
--- Run tests
 local success = run_performance_tests()
 vim.cmd(success and "quit 1" or "quit 0")

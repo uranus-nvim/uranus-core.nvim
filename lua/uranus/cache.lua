@@ -1,10 +1,15 @@
 local M = {}
 
-local config = {
-    max_size = 100,
-    ttl = 30000,
-    enabled = true,
-}
+local config = nil
+
+local function get_config()
+  if not config then
+    local cfg = require("uranus.config")
+    local defaults = cfg.get("cache") or {}
+    config = vim.deepcopy(defaults)
+  end
+  return config
+end
 
 local cache = {}
 local order = {}
@@ -28,7 +33,8 @@ local function make_key(...)
 end
 
 local function is_expired(entry)
-    if not config.enabled then
+    local cfg = get_config()
+    if not cfg.enabled then
         return true
     end
     local now = vim.loop.now()
@@ -36,21 +42,22 @@ local function is_expired(entry)
 end
 
 function M.configure(opts)
-    config = vim.tbl_deep_extend("force", config, opts or {})
+    config = vim.tbl_deep_extend("force", get_config(), opts or {})
 end
 
 function M.get_config()
-    return config
+    return get_config()
 end
 
 function M.set(key, value, ttl)
-    ttl = ttl or config.ttl
+    local cfg = get_config()
+    ttl = ttl or cfg.ttl
     
-    if not config.enabled then
+    if not cfg.enabled then
         return
     end
     
-    if #cache >= config.max_size and not cache[key] then
+    if #cache >= cfg.max_size and not cache[key] then
         local oldest = table.remove(order, 1)
         if oldest then cache[oldest] = nil end
     end

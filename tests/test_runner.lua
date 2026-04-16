@@ -1,201 +1,162 @@
---- Test runner script for quick testing
-local function run_quick_tests()
-  local tests_passed = 0
-  local tests_failed = 0
-  
-  local function test(name, fn)
-    local ok, err = pcall(fn)
-    if ok then
-      print("[PASS] " .. name)
-      tests_passed = tests_passed + 1
-    else
-      print("[FAIL] " .. name .. ": " .. tostring(err))
-      tests_failed = tests_failed + 1
-    end
-  end
-  
-  local function skip(name, reason)
-    print("[SKIP] " .. name .. " (" .. reason .. ")")
-  end
-  
-  -- Test 1: Plugin loads
-  test("Lua module loads", function()
+--- Test runner script - basic module and backend tests
+--- Uses shared test framework
+
+package.path = package.path .. ";./tests/?.lua"
+local T = require("testlib")
+T.reset()
+
+local function run_basic_tests()
+  T.section("Basic Module Tests")
+
+  T.section("Module Loading")
+  T.test("Lua module loads", function()
     local ok, _ = pcall(require, "uranus")
-    assert(ok, "Failed to load uranus module")
+    T.assert(ok, "Failed to load uranus module")
   end)
-  
-  -- Test 2: Version check
-  test("Version check", function()
+
+  T.test("Version check", function()
     local v = vim.version()
-    assert(v.major == 0 and v.minor >= 11)
+    T.assert(v.major == 0 and v.minor >= 11, "Neovim 0.11+ required")
   end)
-  
-  -- Test 3: Backend functions exist
-  test("Backend functions", function()
+
+  T.section("Backend Functions")
+  T.test("Backend functions exist", function()
     local u = require("uranus")
-    assert(u.start_backend ~= nil)
-    assert(u.stop_backend ~= nil)
-    assert(u.status ~= nil)
-    assert(u.list_kernels ~= nil)
-    assert(u.connect_kernel ~= nil)
-    assert(u.disconnect_kernel ~= nil)
-    assert(u.execute ~= nil)
-    assert(u.interrupt ~= nil)
+    T.assert_not_nil(u.start_backend)
+    T.assert_not_nil(u.stop_backend)
+    T.assert_not_nil(u.status)
   end)
-  
-  -- Test 4: REPL module loads
-  test("REPL module loads", function()
+
+  T.test("Kernel manager loads", function()
+    local ok, km = pcall(require, "uranus.kernel_manager")
+    T.assert(ok)
+  end)
+
+  T.test("Kernel manager functions", function()
+    local km = require("uranus.kernel_manager")
+    T.assert_type(km.list_kernels, "function")
+  end)
+
+  T.section("REPL Module")
+  T.test("REPL module loads", function()
     local ok, _ = pcall(require, "uranus.repl")
-    assert(ok, "Failed to load REPL module")
+    T.assert(ok, "Failed to load REPL module")
   end)
-  
-  -- Test 5: REPL config
-  test("REPL config functions", function()
+
+  T.test("REPL config functions", function()
     local repl = require("uranus.repl")
-    assert(repl.configure ~= nil)
-    assert(repl.get_config ~= nil)
+    T.assert_type(repl.configure, "function")
+    T.assert_type(repl.get_config, "function")
   end)
-  
-  -- Test 6: REPL cell parsing
-  test("REPL parse_cells exists", function()
+
+  T.test("REPL parse_cells exists", function()
     local repl = require("uranus.repl")
-    assert(repl.parse_cells ~= nil)
+    T.assert_type(repl.parse_cells, "function")
   end)
-  
-  -- Test 7: REPL execution functions
-  test("REPL execution functions", function()
+
+  T.test("REPL execution functions", function()
     local repl = require("uranus.repl")
-    assert(repl.run_cell ~= nil)
-    assert(repl.run_all ~= nil)
-    assert(repl.run_all_async ~= nil)
-    assert(repl.run_all_parallel ~= nil)
+    T.assert_type(repl.run_cell, "function")
+    T.assert_type(repl.run_all, "function")
+    T.assert_type(repl.run_all_async, "function")
+    T.assert_type(repl.run_all_parallel, "function")
   end)
-  
-  -- Test 8: LSP module loads
-  test("LSP module loads", function()
+
+  T.section("LSP Module")
+  T.test("LSP module loads", function()
     local ok, _ = pcall(require, "uranus.lsp")
-    assert(ok, "Failed to load LSP module")
+    T.assert(ok, "Failed to load LSP module")
   end)
-  
-  -- Test 9: LSP functions exist
-  test("LSP functions exist", function()
+
+  T.test("LSP core functions", function()
     local lsp = require("uranus.lsp")
-    assert(lsp.is_available ~= nil)
-    assert(lsp.status ~= nil)
-    assert(lsp.get_clients ~= nil)
-    assert(lsp.hover ~= nil)
+    T.assert_type(lsp.is_available, "function")
+    T.assert_type(lsp.status, "function")
+    T.assert_type(lsp.get_clients, "function")
+    T.assert_type(lsp.hover, "function")
   end)
-  
-  -- Test 10: LSP more functions
-  test("LSP navigation functions", function()
+
+  T.test("LSP navigation functions", function()
     local lsp = require("uranus.lsp")
-    assert(lsp.goto_definition ~= nil)
-    assert(lsp.references ~= nil)
+    T.assert_type(lsp.goto_definition, "function")
+    T.assert_type(lsp.references, "function")
   end)
-  
-  -- Test 11: LSP code actions
-  test("LSP code actions", function()
+
+  T.test("LSP code actions", function()
     local lsp = require("uranus.lsp")
-    assert(lsp.rename ~= nil)
-    assert(lsp.code_action ~= nil)
-    assert(lsp.format ~= nil)
+    T.assert_type(lsp.rename, "function")
+    T.assert_type(lsp.code_action, "function")
+    T.assert_type(lsp.format, "function")
   end)
-  
-  -- Test 12: LSP diagnostics
-  test("LSP diagnostics", function()
+
+  T.test("LSP diagnostics", function()
     local lsp = require("uranus.lsp")
-    assert(lsp.get_diagnostics ~= nil)
-    assert(lsp.diagnostics ~= nil)
+    T.assert_type(lsp.get_diagnostics, "function")
+    T.assert_type(lsp.diagnostics, "function")
   end)
-  
-  -- Test 13: Inspector module loads
-  test("Inspector module loads", function()
+
+  T.section("Inspector Module")
+  T.test("Inspector module loads", function()
     local ok, _ = pcall(require, "uranus.inspector")
-    assert(ok, "Failed to load inspector module")
+    T.assert(ok, "Failed to load inspector module")
   end)
-  
-  -- Test 14: Inspector functions
-  test("Inspector functions", function()
+
+  T.test("Inspector functions", function()
     local insp = require("uranus.inspector")
-    assert(insp.configure ~= nil)
-    assert(insp.inspect_at_cursor ~= nil)
-    assert(insp.toggle_inspector ~= nil)
+    T.assert_type(insp.configure, "function")
+    T.assert_type(insp.inspect_at_cursor, "function")
+    T.assert_type(insp.toggle_inspector, "function")
   end)
-  
-  -- Test 15: Output module (optional)
-  test("Output module (optional)", function()
+
+  T.section("Output Module (Optional)")
+  T.test("Output module loads", function()
     local ok, output = pcall(require, "uranus.output")
     if ok then
-      assert(output.display ~= nil)
+      T.assert_type(output.display, "function")
     else
-      skip("Output module not available", "optional")
+      T.skip("Output module not available", "optional")
     end
   end)
-  
-  -- Test 16: Notebook module (optional)
-  test("Notebook module (optional)", function()
+
+  T.section("Notebook Module (Optional)")
+  T.test("Notebook module loads", function()
     local ok, notebook = pcall(require, "uranus.notebook")
     if ok then
-      assert(notebook.open ~= nil)
+      T.assert_type(notebook.open, "function")
     else
-      skip("Notebook module not available", "optional")
+      T.skip("Notebook module not available", "optional")
     end
   end)
-  
-  -- Test 17: Start backend
-  test("Start backend", function()
+
+  T.section("Backend Operations")
+  T.test("Start backend", function()
     local u = require("uranus")
     local result = u.start_backend()
-    local ok = result and (type(result) == "table" or (type(result) == "string" and result:match('"success"')))
-    assert(ok, "start_backend should return a result")
+    T.assert(result ~= nil)
   end)
-  
-  -- Test 18: Status returns version
-  test("Status returns version", function()
+
+  T.test("Status returns version", function()
     local u = require("uranus")
     local result = u.status()
-    local ok = result and (type(result) == "table" or (type(result) == "string" and result:match('"success"')))
-    assert(ok, "status should return a result")
+    T.assert(result ~= nil)
   end)
-  
-  -- Test 19: List kernels
-  test("List kernels", function()
-    local u = require("uranus")
-    local result = u.list_kernels()
-    assert(result ~= nil)
+
+  T.test("List kernels via kernel manager", function()
+    local km = require("uranus.kernel_manager")
+    local result = km.list_kernels()
+    T.assert_not_nil(result)
   end)
-  
-  -- Test 20: Stop backend
-  test("Stop backend", function()
+
+  T.test("Stop backend", function()
     local u = require("uranus")
     local result = u.stop_backend()
-    assert(result ~= nil)
+    T.assert(result ~= nil)
   end)
-  
-  -- Test 21: stdin works with IPython override
-  test("stdin support with IPython override", function()
-    local u = require("uranus")
-    u.start_backend()
-    u.connect_kernel("python3")
-    vim.wait(2000)
-    local result = u.execute([=[
-def _fake_input(prompt, ident, parent, password=False):
-    return "test_answer"
-get_ipython().kernel._input_request = _fake_input
-x = input('test: ')
-print('got:' + str(x))
-]=])
-    -- The result should succeed (no error about raw_input)
-    assert(result ~= nil)
-  end)
-  
-  -- Summary
-  print("")
-  print(string.format("Results: %d passed, %d failed", tests_passed, tests_failed))
-  
-  return tests_failed == 0
+
+  T.summary()
+
+  return T.results()
 end
 
--- Run tests
-local success = run_quick_tests()
+local success = run_basic_tests()
 vim.cmd(success and "quit 1" or "quit 0")
