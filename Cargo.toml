@@ -9,7 +9,7 @@ name = "uranus"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-nvim-oxi = { version = "0.6", features = ["mlua", "neovim-0-11"] }
+nvim-oxi = { version = "0.6", features = ["neovim-0-11"] }
 runtimelib = { version = "1.5", features = ["tokio-runtime"] }
 jupyter-protocol = "1.4"
 nbformat = "1.2"
