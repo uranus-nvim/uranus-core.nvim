@@ -27,7 +27,8 @@ repos:
       - id: stylua
         args: [--check]
 
-  - repo: https://github.com/marketplace/actions/luacheck-action
-    uses: JohnnyMorganz/luacheck-action@v2
-    with:
-      args: --config .luacheckrc
+- repo: https://github.com/JohnnyMorganz/luacheck-action
+  rev: v2
+  hooks:
+  - id: luacheck
+    args: --config .luacheckrc
