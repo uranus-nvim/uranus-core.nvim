@@ -58,7 +58,7 @@ jobs:
           args: --config .luacheckrc .
 
       - name: Install StyLua
-        uses:JohnnyMorganz/StyLua-Action@v2
+        uses: JohnnyMorganz/StyLua-Action@v2
         with:
           args: --check lua/ tests/
 
