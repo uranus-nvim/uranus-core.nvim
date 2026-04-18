@@ -85,11 +85,8 @@ impl ZeroCopyParser {
             return results;
         }
 
-        match serde_json::from_slice::<T>(&data) {
-            Ok(item) => {
-                results.push(item);
-            }
-            Err(_) => {}
+        if let Ok(item) = serde_json::from_slice::<T>(&data) {
+            results.push(item);
         }
 
         results

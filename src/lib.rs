@@ -212,6 +212,7 @@ pub trait KernelTrait: Send + Sync {
 }
 
 /// Internal plugin state.
+#[derive(Default)]
 struct UranusState {
     /// Whether the backend is running.
     backend_running: bool,
@@ -221,17 +222,6 @@ struct UranusState {
     current_kernel: Option<String>,
     /// Whether configuration is valid.
     config_valid: bool,
-}
-
-impl Default for UranusState {
-    fn default() -> Self {
-        Self {
-            backend_running: false,
-            kernels: HashMap::new(),
-            current_kernel: None,
-            config_valid: false,
-        }
-    }
 }
 
 // ============================================================================

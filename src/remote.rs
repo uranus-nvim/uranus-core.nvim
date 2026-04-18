@@ -105,74 +105,72 @@ impl RemoteKernelHandle {
         loop {
             waits += 1;
             tokio::select! {
-                msg = kernel.next() => {
-                    match msg {
-                        Some(Ok(response)) => {
-                            match response.content {
-                                JupyterMessageContent::StreamContent(stream) => {
-                                    use jupyter_protocol::messaging::Stdio;
-                                    match stream.name {
-                                        Stdio::Stdout => stdout_content.push_str(&stream.text),
-                                        Stdio::Stderr => {
-                                            stderr_content.get_or_insert_with(String::new).push_str(&stream.text);
-                                        }
-                                    }
-                                }
-                                JupyterMessageContent::ExecuteInput(_) => {}
-                                JupyterMessageContent::ExecuteResult(ref result) => {
-                                    execution_count = result.execution_count.0 as i32;
-                                    for media_type in &result.data.content {
-                                        use jupyter_protocol::media::MediaType;
-                                        match media_type {
-                                            MediaType::Plain(text) => {
-                                                data.insert("text/plain".to_string(), text.clone());
+                            msg = kernel.next() => {
+                                match msg {
+                                    Some(Ok(response)) => {
+                                        match response.content {
+                                            JupyterMessageContent::StreamContent(stream) => {
+                                                use jupyter_protocol::messaging::Stdio;
+                                                match stream.name {
+                                                    Stdio::Stdout => stdout_content.push_str(&stream.text),
+                                                    Stdio::Stderr => {
+                                                        stderr_content.get_or_insert_with(String::new).push_str(&stream.text);
+                                                    }
+                                                }
                                             }
-                                            MediaType::Html(html) => {
-                                                data.insert("text/html".to_string(), html.clone());
+                                            JupyterMessageContent::ExecuteInput(_) => {}
+                                            JupyterMessageContent::ExecuteResult(ref result) => {
+                                                execution_count = result.execution_count.0 as i32;
+                                                for media_type in &result.data.content {
+                                                    use jupyter_protocol::media::MediaType;
+                                                    match media_type {
+                                                        MediaType::Plain(text) => {
+                                                            data.insert("text/plain".to_string(), text.clone());
+                                                        }
+                                                        MediaType::Html(html) => {
+                                                            data.insert("text/html".to_string(), html.clone());
+                                                        }
+                                                        MediaType::Png(png) => {
+                                                            data.insert("image/png".to_string(), png.clone());
+                                                        }
+                                                        MediaType::Jpeg(jpeg) => {
+                                                            data.insert("image/jpeg".to_string(), jpeg.clone());
+                                                        }
+                                                        MediaType::Svg(svg) => {
+                                                            data.insert("image/svg+xml".to_string(), svg.clone());
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
                                             }
-                                            MediaType::Png(png) => {
-                                                data.insert("image/png".to_string(), png.clone());
+                                            JupyterMessageContent::ErrorOutput(err) => {
+                                                error_msg = Some(err.evalue.clone());
                                             }
-                                            MediaType::Jpeg(jpeg) => {
-                                                data.insert("image/jpeg".to_string(), jpeg.clone());
-                                            }
-                                            MediaType::Svg(svg) => {
-                                                data.insert("image/svg+xml".to_string(), svg.clone());
+            JupyterMessageContent::Status(status) => {
+              if status.execution_state == jupyter_protocol::messaging::ExecutionState::Idle && waits > 1 {
+                break;
+              }
+            }
+                                            JupyterMessageContent::ExecuteReply(reply) => {
+                                                if reply.status == jupyter_protocol::messaging::ReplyStatus::Error {
+                                                    error_msg = reply.error.as_ref().map(|e| e.evalue.clone());
+                                                } else {
+                                                    execution_count = reply.execution_count.0 as i32;
+                                                }
                                             }
                                             _ => {}
                                         }
                                     }
+                                    Some(Err(_)) => {}
+                                    None => break,
                                 }
-                                JupyterMessageContent::ErrorOutput(err) => {
-                                    error_msg = Some(err.evalue.clone());
+                            }
+                            _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
+                                if waits > 10 {
+                                    break;
                                 }
-                                JupyterMessageContent::Status(status) => {
-                                    if status.execution_state == jupyter_protocol::messaging::ExecutionState::Idle {
-                                        if waits > 1 {
-                                            break;
-                                        }
-                                    }
-                                }
-                                JupyterMessageContent::ExecuteReply(reply) => {
-                                    if reply.status == jupyter_protocol::messaging::ReplyStatus::Error {
-                                        error_msg = reply.error.as_ref().map(|e| e.evalue.clone());
-                                    } else {
-                                        execution_count = reply.execution_count.0 as i32;
-                                    }
-                                }
-                                _ => {}
                             }
                         }
-                        Some(Err(_)) => {}
-                        None => break,
-                    }
-                }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
-                    if waits > 10 {
-                        break;
-                    }
-                }
-            }
         }
 
         Ok(ExecutionResult {
@@ -231,7 +229,7 @@ impl RemoteKernelHandle {
         let result = self.execute_async(&inspect_code).await?;
 
         if let Some(output) = result.stdout {
-            if let Ok(ok) = serde_json::from_str::<serde_json::Value>(&output.trim()) {
+            if let Ok(ok) = serde_json::from_str::<serde_json::Value>(output.trim()) {
                 return Ok(InspectResult {
                     found: true,
                     name: code.to_string(),

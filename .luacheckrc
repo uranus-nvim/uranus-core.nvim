@@ -3,7 +3,7 @@
 
 cache = true
 exclude = { ".luarocks", "target" }
-max_line_length = 120
+max-line-length = 120
 max-cyclomatic-complexity = 20
 
 globals = {

@@ -11,10 +11,11 @@ use thiserror::Error;
 /// Error codes for Uranus operations.
 ///
 /// These codes are used for programmatic error handling in Neovim.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
     /// Kernel-related error.
+    #[default]
     KernelError,
     /// Connection error.
     ConnectionError,
@@ -87,12 +88,6 @@ impl fmt::Display for ErrorCode {
             ErrorCode::PermissionDenied => "PERMISSION_DENIED",
         };
         write!(f, "{}", name)
-    }
-}
-
-impl Default for ErrorCode {
-    fn default() -> Self {
-        ErrorCode::KernelError
     }
 }
 

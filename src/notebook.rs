@@ -222,7 +222,7 @@ fn convert_v4_notebook(nb: nbformat::v4::Notebook) -> Result<Notebook> {
                 source,
                 metadata: serde_json::to_value(metadata).unwrap_or_default(),
                 outputs: Vec::new(),
-                execution_count: execution_count.map(|ec| ec),
+                execution_count,
             },
             nbformat::v4::Cell::Markdown {
                 source, metadata, ..

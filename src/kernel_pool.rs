@@ -57,15 +57,11 @@ impl KernelPool {
     pub fn acquire(&self, kernel_name: &str) -> Option<Arc<dyn KernelTrait>> {
         let mut kernels = self.kernels.write();
 
-        let available = kernels
-            .entry(kernel_name.to_string())
-            .or_insert_with(Vec::new);
+        let available = kernels.entry(kernel_name.to_string()).or_default();
 
         while let Some(pooled) = available.pop() {
-            if pooled.last_used.elapsed() < self.max_idle_time {
-                if !pooled.in_use {
-                    return Some(pooled.kernel);
-                }
+            if pooled.last_used.elapsed() < self.max_idle_time && !pooled.in_use {
+                return Some(pooled.kernel);
             }
         }
 
@@ -77,9 +73,7 @@ impl KernelPool {
         let mut kernels = self.kernels.write();
         let kernel_type = kernel.kernel_type();
 
-        let entry = kernels
-            .entry(kernel_type.to_string())
-            .or_insert_with(Vec::new);
+        let entry = kernels.entry(kernel_type.to_string()).or_default();
 
         if entry.len() < self.max_idle_per_kernel {
             entry.push(PooledKernel {
