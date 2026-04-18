@@ -24,22 +24,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-- name: Install Rust toolchain
-uses: dtolnay/rust-toolchain@stable
-with:
-  toolchain: ${{ matrix.rust }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
 
-- name: Install rustfmt
-run: rustup component add rustfmt
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
 
-- name: Cache cargo registry
-uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --check
 
-- name: Check formatting
-run: cargo fmt --check
-
-- name: Check clippy
-run: cargo clippy -- -D warnings --allow dead_code
+      - name: Check clippy
+        run: cargo clippy -- -D warnings
 
       - name: Build
         run: cargo build --release
@@ -47,20 +44,33 @@ run: cargo clippy -- -D warnings --allow dead_code
       - name: Run tests
         run: cargo test
 
-  lua:
-    name: Lua
-    runs-on: ubuntu-latest
+lua:
+  name: Lua
+  runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Install luacheck
-        uses: lunarmodules/luacheck@v1
-        with:
-          args: --config .luacheckrc .
+  - name: Install Neovim
+    uses: rhysd/action-setup-neovim@v1
+    with:
+      neovim-version: '0.11.4'
 
-      - name: Install StyLua
-        uses: JohnnyMorganz/StyLua-Action@v2
-        with:
-          args: --check lua/ tests/
+  - name: Install luacheck
+    run: luarocks install luacheck
+
+  - name: Lint Lua
+    run: luacheck --config .luacheckrc lua/ tests/
+
+  - name: Install StyLua
+    uses: JohnnyMorganz/stylua-action@v4
+    with:
+      token: ${{ secrets.GITHUB_TOKEN }}
+      version: latest
+
+  - name: Check formatting
+    run: stylua --check lua/ tests/
+
+  - name: Run Lua tests
+    run: nvim --headless -u tests/minimal_init.lua -c "lua dofile('tests/test_runner.lua')" -c "qa!"
