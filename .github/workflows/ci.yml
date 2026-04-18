@@ -52,10 +52,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Neovim
-        uses: neovim/actions/setup-neovim@v1
+      - name: Setup Neovim
+        uses: neovim/setup-neovim@v1
         with:
-          neovim-version: "0.11.4"
+          version: "0.11.4"
 
       - name: Install luacheck
         run: luarocks install luacheck
