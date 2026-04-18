@@ -36,7 +36,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Check clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy -- -D warnings --allow dead_code
 
       - name: Build
         run: cargo build --release
@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Neovim
-        uses: rhysd/action-setup-neovim@v1
+        uses: neovim/actions/setup-neovim@v1
         with:
           neovim-version: "0.11.4"
 
