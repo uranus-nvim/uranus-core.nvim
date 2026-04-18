@@ -44,33 +44,33 @@ jobs:
       - name: Run tests
         run: cargo test
 
-lua:
-  name: Lua
-  runs-on: ubuntu-latest
+  lua:
+    name: Lua
+    runs-on: ubuntu-latest
 
-  steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Install Neovim
-    uses: rhysd/action-setup-neovim@v1
-    with:
-      neovim-version: '0.11.4'
+      - name: Install Neovim
+        uses: rhysd/action-setup-neovim@v1
+        with:
+          neovim-version: "0.11.4"
 
-  - name: Install luacheck
-    run: luarocks install luacheck
+      - name: Install luacheck
+        run: luarocks install luacheck
 
-  - name: Lint Lua
-    run: luacheck --config .luacheckrc lua/ tests/
+      - name: Lint Lua
+        run: luacheck --config .luacheckrc lua/ tests/
 
-  - name: Install StyLua
-    uses: JohnnyMorganz/stylua-action@v4
-    with:
-      token: ${{ secrets.GITHUB_TOKEN }}
-      version: latest
+      - name: Install StyLua
+        uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
 
-  - name: Check formatting
-    run: stylua --check lua/ tests/
+      - name: Check formatting
+        run: stylua --check lua/ tests/
 
-  - name: Run Lua tests
-    run: nvim --headless -u tests/minimal_init.lua -c "lua dofile('tests/test_runner.lua')" -c "qa!"
+      - name: Run Lua tests
+        run: nvim --headless -u tests/minimal_init.lua -c "lua dofile('tests/test_runner.lua')" -c "qa!"
