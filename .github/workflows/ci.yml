@@ -47,19 +47,17 @@ jobs:
   lua:
     name: Lua
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Neovim
-        uses: neovim/actions/setup@v1
-        with:
-          neovim-version: "0.11.4"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y neovim
 
       - name: Install LuaRocks
         run: |
-          sudo apt-get update
           sudo apt-get install -y luarocks
 
       - name: Install luacheck
@@ -78,4 +76,5 @@ jobs:
         run: stylua --check lua/ tests/
 
       - name: Run Lua tests
-        run: nvim --headless -u tests/minimal_init.lua -c "lua dofile('tests/test_runner.lua')" -c "qa!"
+        run: |
+          nvim --headless -u tests/minimal_init.lua -c "lua dofile('tests/test_runner.lua')" -c "qa!"
