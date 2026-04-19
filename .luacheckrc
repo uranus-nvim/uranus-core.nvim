@@ -12,13 +12,8 @@ globals = {
   "it",
   "before_each",
   "after_each",
+  "state", -- state is mutated by init.lua
 }
-
--- Define 'state' as a global (it's used in init.lua)
-read_globals = { "state" }
-
--- Allow unused variables with underscore prefix
-unused = false
 
 -- Ignore warnings by code:
 -- 2..: redefined variables
