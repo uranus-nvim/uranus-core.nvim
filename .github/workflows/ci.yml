@@ -28,6 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
 
       - name: Cache cargo registry
         uses: Swatinem/rust-cache@v2
@@ -61,10 +62,10 @@ jobs:
           sudo apt-get install -y luarocks
 
       - name: Install luacheck
-        run: luarocks install luacheck
+        run: luarocks install --local luacheck
 
       - name: Lint Lua
-        run: luacheck --config .luacheckrc lua/ tests/
+        run: ~/.luarocks/bin/luacheck --config .luacheckrc lua/ tests/
 
       - name: Install StyLua
         uses: JohnnyMorganz/stylua-action@v4
