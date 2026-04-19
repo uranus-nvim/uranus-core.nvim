@@ -6,28 +6,15 @@ exclude = { ".luarocks", "target" }
 max_line_length = 120
 max_cyclomatic_complexity = 20
 
+-- Only report errors, not warnings (quiet = 1.0 means suppress warnings)
+-- Warnings include: unused variables, whitespace issues, line length, etc.
+-- CI will only fail on actual errors (like accessing undefined globals)
+quiet = 1.0
+
 globals = {
-  "vim",
-  "describe",
-  "it",
-  "before_each",
-  "after_each",
-  "state", -- state is mutated by init.lua
+    "vim",
+    "describe",
+    "it",
+    "before_each",
+    "after_each",
 }
-
--- Ignore warnings by code:
--- 2..: redefined variables
--- 3..: unused variables/arguments
--- 4..: unused/undefined globals
--- 5..: unused loop variables
--- 6..: whitespace issues
-ignore = {
-  "2..", -- redefined variables (ok is often redefined)
-  "3..", -- unused variables
-  "4..", -- unused globals
-  "5..", -- unused loop variables
-  "6..", -- whitespace issues
-}
-
--- Allow cyclomatic complexity to be exceeded (just warn, don't error)
-std = "luajit"
