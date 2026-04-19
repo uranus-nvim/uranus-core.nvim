@@ -1,7 +1,7 @@
 //! Async task scheduling bridge to the global runtime.
+#![allow(dead_code)]
 
-use std::pin::Pin;
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 
 use tokio::sync::mpsc;
 

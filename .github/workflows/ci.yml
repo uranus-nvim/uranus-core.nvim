@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   rust:
-    name: Rust (${{ matrix.os }})
+    name: Rust (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -34,6 +34,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
+        if: matrix.rust == 'stable'
         run: cargo fmt --check
 
       - name: Check clippy
@@ -66,8 +67,9 @@ jobs:
 
       - name: Lint Lua
         run: |
-          # Run luacheck but don't fail on warnings, only errors
-          ~/.luarocks/bin/luacheck --config .luacheckrc --no-color lua/ tests/ || true
+          if [ -f .luacheckrc ]; then
+            ~/.luarocks/bin/luacheck --config .luacheckrc --no-color lua/ tests/
+          fi
 
       - name: Install StyLua
         uses: JohnnyMorganz/stylua-action@v4

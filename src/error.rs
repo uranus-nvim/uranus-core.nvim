@@ -1,7 +1,8 @@
 //! Error types and handling for Uranus.
 //!
-//! This module provides comprehensive error types using `thiserror` for all Uranus operations.
-//! It includes error codes, error responses, and convenient error constructors.
+//! This module provides comprehensive error types using `thiserror` for all
+//! Uranus operations. It includes error codes, error responses, and convenient
+//! error constructors.
 
 use std::fmt;
 
@@ -93,7 +94,8 @@ impl fmt::Display for ErrorCode {
 
 /// Main error type for Uranus operations.
 ///
-/// Uses `thiserror` for derive-based error handling with various error variants.
+/// Uses `thiserror` for derive-based error handling with various error
+/// variants.
 #[derive(Error, Debug)]
 pub enum UranusError {
     #[error("Kernel error: {0}")]
@@ -273,7 +275,8 @@ impl<'de> Deserialize<'de> for UranusError {
 
 /// Error response for serialization to Neovim.
 ///
-/// This struct provides a consistent error format for returning errors to Neovim.
+/// This struct provides a consistent error format for returning errors to
+/// Neovim.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorResponse {
     /// Error code for programmatic handling.

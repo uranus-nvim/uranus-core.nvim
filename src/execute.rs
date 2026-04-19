@@ -2,6 +2,7 @@
 //!
 //! This module provides execution-related utilities for the plugin.
 //! Currently a placeholder for future execution enhancements.
+#![allow(dead_code)]
 
 use std::fmt;
 

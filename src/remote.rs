@@ -1,21 +1,19 @@
 //! Remote Jupyter kernel management via WebSocket.
 //!
-//! This module provides the `RemoteKernelHandle` for connecting to and executing code
-//! in remote Jupyter kernels via the Jupyter Server WebSocket protocol.
-
+//! This module provides the `RemoteKernelHandle` for connecting to and
+//! executing code in remote Jupyter kernels via the Jupyter Server WebSocket
+//! protocol.
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{SinkExt as _, StreamExt as _};
 use jupyter_protocol::{messaging::JupyterMessageContent, KernelInfoRequest};
 use jupyter_websocket_client::{JupyterWebSocket, RemoteServer};
-use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::error::UranusError;
-use crate::{ExecutionResult, InspectResult, KernelInfo, KernelTrait};
+use crate::{error::UranusError, ExecutionResult, InspectResult, KernelInfo, KernelTrait};
 
 /// Handle for a connected remote Jupyter kernel.
 ///
@@ -105,73 +103,73 @@ impl RemoteKernelHandle {
         loop {
             waits += 1;
             tokio::select! {
-                                                    msg = kernel.next() => {
-                                                        match msg {
-                                                            Some(Ok(response)) => {
-                                                                match response.content {
-                                                                    JupyterMessageContent::StreamContent(stream) => {
-                                                                        use jupyter_protocol::messaging::Stdio;
-                                                                        match stream.name {
-                                                                            Stdio::Stdout => stdout_content.push_str(&stream.text),
-                                                                            Stdio::Stderr => {
-                                                                                stderr_content.get_or_insert_with(String::new).push_str(&stream.text);
+                                                        msg = kernel.next() => {
+                                                            match msg {
+                                                                Some(Ok(response)) => {
+                                                                    match response.content {
+                                                                        JupyterMessageContent::StreamContent(stream) => {
+                                                                            use jupyter_protocol::messaging::Stdio;
+                                                                            match stream.name {
+                                                                                Stdio::Stdout => stdout_content.push_str(&stream.text),
+                                                                                Stdio::Stderr => {
+                                                                                    stderr_content.get_or_insert_with(String::new).push_str(&stream.text);
+                                                                                }
                                                                             }
                                                                         }
-                                                                    }
-                                                                    JupyterMessageContent::ExecuteInput(_) => {}
-                                                                    JupyterMessageContent::ExecuteResult(ref result) => {
-                                                                        execution_count = result.execution_count.0 as i32;
-                                                                        for media_type in &result.data.content {
-                                                                            use jupyter_protocol::media::MediaType;
-                                                                            match media_type {
-                                                                                MediaType::Plain(text) => {
-                                                                                    data.insert("text/plain".to_string(), text.clone());
+                                                                        JupyterMessageContent::ExecuteInput(_) => {}
+                                                                        JupyterMessageContent::ExecuteResult(ref result) => {
+                                                                            execution_count = result.execution_count.0 as i32;
+                                                                            for media_type in &result.data.content {
+                                                                                use jupyter_protocol::media::MediaType;
+                                                                                match media_type {
+                                                                                    MediaType::Plain(text) => {
+                                                                                        data.insert("text/plain".to_string(), text.clone());
+                                                                                    }
+                                                                                    MediaType::Html(html) => {
+                                                                                        data.insert("text/html".to_string(), html.clone());
+                                                                                    }
+                                                                                    MediaType::Png(png) => {
+                                                                                        data.insert("image/png".to_string(), png.clone());
+                                                                                    }
+                                                                                    MediaType::Jpeg(jpeg) => {
+                                                                                        data.insert("image/jpeg".to_string(), jpeg.clone());
+                                                                                    }
+                                                                                    MediaType::Svg(svg) => {
+                                                                                        data.insert("image/svg+xml".to_string(), svg.clone());
+                                                                                    }
+                                                                                    _ => {}
                                                                                 }
-                                                                                MediaType::Html(html) => {
-                                                                                    data.insert("text/html".to_string(), html.clone());
-                                                                                }
-                                                                                MediaType::Png(png) => {
-                                                                                    data.insert("image/png".to_string(), png.clone());
-                                                                                }
-                                                                                MediaType::Jpeg(jpeg) => {
-                                                                                    data.insert("image/jpeg".to_string(), jpeg.clone());
-                                                                                }
-                                                                                MediaType::Svg(svg) => {
-                                                                                    data.insert("image/svg+xml".to_string(), svg.clone());
-                                                                                }
-                                                                                _ => {}
                                                                             }
                                                                         }
-                                                                    }
-            JupyterMessageContent::ErrorOutput(err) => {
-              error_msg = Some(err.evalue.clone());
-            }
-            JupyterMessageContent::Status(status) => {
-              #[allow(clippy::collapsible_if)]
-              if status.execution_state == jupyter_protocol::messaging::ExecutionState::Idle && waits > 1 {
+                JupyterMessageContent::ErrorOutput(err) => {
+                  error_msg = Some(err.evalue.clone());
+                }
+            JupyterMessageContent::Status(status)
+                if status.execution_state == jupyter_protocol::messaging::ExecutionState::Idle
+                    && waits > 1 =>
+            {
                 break;
-              }
             }
-                                                                    JupyterMessageContent::ExecuteReply(reply) => {
-                                                                        if reply.status == jupyter_protocol::messaging::ReplyStatus::Error {
-                                                                            error_msg = reply.error.as_ref().map(|e| e.evalue.clone());
-                                                                        } else {
-                                                                            execution_count = reply.execution_count.0 as i32;
+                                                                        JupyterMessageContent::ExecuteReply(reply) => {
+                                                                            if reply.status == jupyter_protocol::messaging::ReplyStatus::Error {
+                                                                                error_msg = reply.error.as_ref().map(|e| e.evalue.clone());
+                                                                            } else {
+                                                                                execution_count = reply.execution_count.0 as i32;
+                                                                            }
                                                                         }
+                                                                        _ => {}
                                                                     }
-                                                                    _ => {}
                                                                 }
+                                                                Some(Err(_)) => {}
+                                                                None => break,
                                                             }
-                                                            Some(Err(_)) => {}
-                                                            None => break,
+                                                        }
+                                                        _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
+                                                            if waits > 10 {
+                                                                break;
+                                                            }
                                                         }
                                                     }
-                                                    _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
-                                                        if waits > 10 {
-                                                            break;
-                                                        }
-                                                    }
-                                                }
         }
 
         Ok(ExecutionResult {

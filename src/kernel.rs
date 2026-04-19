@@ -12,13 +12,15 @@ use std::collections::HashMap;
 
 use tracing::info;
 
-use crate::connection::{
-    create_control_connection, create_iopub_connection, create_shell_connection,
-    create_stdin_connection, ConnectionInfo,
+use crate::{
+    connection::{
+        create_control_connection, create_iopub_connection, create_shell_connection,
+        create_stdin_connection, ConnectionInfo,
+    },
+    error::UranusError,
+    runtime::with_runtime,
+    ExecutionResult, InspectResult, KernelInfo, KernelTrait,
 };
-use crate::error::UranusError;
-use crate::runtime::with_runtime;
-use crate::{ExecutionResult, InspectResult, KernelInfo, KernelTrait};
 
 /// A connected local kernel.
 #[derive(Clone, Debug)]

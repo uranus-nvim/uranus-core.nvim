@@ -2,10 +2,11 @@
 //!
 //! This module provides a connection pool for kernel handles,
 //! allowing reuse of kernel connections to reduce startup overhead.
-
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use parking_lot::RwLock;
 

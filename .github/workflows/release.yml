@@ -38,13 +38,7 @@ jobs:
       - name: Copy binary to artifact
         run: |
           mkdir -p artifact
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp target/release/uranus.dll artifact/${{ matrix.artifact_name }}
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp target/release/liburanus.dylib artifact/${{ matrix.artifact_name }}
-          else
-            cp target/release/liburanus.so artifact/${{ matrix.artifact_name }}
-          fi
+          cp target/release/${{ matrix.artifact_name }} artifact/${{ matrix.artifact_name }}
         shell: bash
 
       - name: Upload artifact

@@ -2,6 +2,7 @@
 //!
 //! This module provides utilities for managing connections to Jupyter kernels
 //! using runtimelib and jupyter-protocol.
+#![allow(dead_code)]
 
 use std::path::PathBuf;
 

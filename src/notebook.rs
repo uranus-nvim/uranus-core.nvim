@@ -1,7 +1,7 @@
 //! Jupyter Notebook parsing and serialization.
 //!
-//! This module provides utilities for parsing and serializing Jupyter Notebook files (.ipynb)
-//! using the `nbformat` crate.
+//! This module provides utilities for parsing and serializing Jupyter Notebook
+//! files (.ipynb) using the `nbformat` crate.
 //!
 //! # Usage
 //!
@@ -10,6 +10,7 @@
 //!
 //! let nb = parse_notebook(r#"{"cells": [], "nbformat": 4, "nbformat_minor": 5}"#).unwrap();
 //! ```
+#![allow(dead_code)]
 
 use std::path::Path;
 

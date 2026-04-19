@@ -2,13 +2,9 @@
 //!
 //! This module provides utilities for running tasks in parallel
 //! with semaphore-based concurrency limiting.
+use std::{future::Future, pin::Pin, sync::Arc};
 
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-
-use tokio::sync::Semaphore;
-use tokio::task::JoinSet;
+use tokio::{sync::Semaphore, task::JoinSet};
 
 /// Parallel executor with concurrency limiting.
 pub struct ParallelExecutor {

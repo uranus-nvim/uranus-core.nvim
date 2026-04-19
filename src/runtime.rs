@@ -2,6 +2,7 @@
 //!
 //! This module provides a singleton global Tokio runtime for async operations
 //! throughout the plugin. The runtime is lazily initialized on first use.
+#![allow(dead_code)]
 
 use std::sync::Arc;
 
@@ -14,8 +15,8 @@ static GLOBAL_RUNTIME: OnceCell<Arc<RwLock<Option<Runtime>>>> = OnceCell::new();
 
 /// Initializes the global Tokio runtime.
 ///
-/// Creates a multi-threaded runtime with 4 worker threads if not already initialized.
-/// Returns a reference to the runtime wrapper.
+/// Creates a multi-threaded runtime with 4 worker threads if not already
+/// initialized. Returns a reference to the runtime wrapper.
 pub fn init_global_runtime() -> &'static Arc<RwLock<Option<Runtime>>> {
     GLOBAL_RUNTIME.get_or_init(|| {
         let runtime = Builder::new_multi_thread()

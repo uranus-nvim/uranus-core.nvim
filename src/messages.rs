@@ -2,6 +2,7 @@
 //!
 //! This module provides efficient message parsing utilities
 //! for Jupyter protocol messages using Bytes for zero-copy operations.
+#![allow(dead_code)]
 
 use bytes::{Bytes, BytesMut};
 

@@ -1,4 +1,5 @@
-//! Uranus - A Neovim plugin with a Rust backend for Jupyter kernel communication.
+//! Uranus - A Neovim plugin with a Rust backend for Jupyter kernel
+//! communication.
 //!
 //! This crate provides a Neovim plugin with a Rust backend for communicating
 //! with Jupyter kernels. It supports both local kernels (via ZeroMQ using
@@ -6,8 +7,10 @@
 //!
 //! # Architecture
 //!
-//! - **Local kernels**: Connect via ZeroMQ using [`runtimelib`] and [`jupyter_protocol`]
-//! - **Remote kernels**: Connect via WebSocket using [`jupyter_websocket_client`]
+//! - **Local kernels**: Connect via ZeroMQ using [`runtimelib`] and
+//!   [`jupyter_protocol`]
+//! - **Remote kernels**: Connect via WebSocket using
+//!   [`jupyter_websocket_client`]
 //! - **Neovim integration**: Uses [`nvim_oxi`] for plugin API
 //! - **Notebook support**: Parses .ipynb files using [`nbformat`]
 //!
@@ -54,21 +57,18 @@ mod runtime;
 // ============================================================================
 // Re-exports for Public API
 // ============================================================================
+use std::{collections::HashMap, sync::Arc};
 
 pub use error::{ErrorCode, ErrorResponse, UranusError};
 pub use kernel::KernelHandle;
 pub use kernel_pool::{KernelPool, PoolStats, PooledKernel};
 pub use messages::{JupyterMessage, MessageBuffer, ZeroCopyParser};
 pub use notebook::{Notebook, NotebookCell};
+use once_cell::sync::Lazy;
 pub use parallel::{run_parallel, run_sequential, ParallelExecutor};
+use parking_lot::RwLock;
 pub use remote::RemoteKernelHandle;
 pub use runtime::{init_global_runtime, RuntimeStatus};
-
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use once_cell::sync::Lazy;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
@@ -78,7 +78,8 @@ static STATE: Lazy<RwLock<UranusState>> = Lazy::new(|| RwLock::new(UranusState::
 /// Result type for all public API functions.
 ///
 /// This is the primary return type for all plugin commands exposed to Neovim.
-/// It provides a consistent JSON-serializable structure with success/error status.
+/// It provides a consistent JSON-serializable structure with success/error
+/// status.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[must_use]
 pub struct UranusResult {
@@ -391,8 +392,9 @@ pub fn connect_remote_kernel(server_url: &str, kernel_id: &str) -> UranusResult 
 
 /// Plugin entry point for nvim-oxi.
 ///
-/// This function is marked with #[plugin] and is the entry point called by Neovim
-/// when loading the plugin. It registers all commands with Neovim's Lua API.
+/// This function is marked with #[plugin] and is the entry point called by
+/// Neovim when loading the plugin. It registers all commands with Neovim's Lua
+/// API.
 #[nvim_oxi::plugin]
 fn uranus() -> nvim_oxi::Dictionary {
     use nvim_oxi::{Function, Object};
