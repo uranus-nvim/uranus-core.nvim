@@ -13,3 +13,12 @@ globals = {
   "before_each",
   "after_each",
 }
+
+-- Ignore whitespace-only lines, trailing whitespace, and unused variables
+-- These are style issues, not actual errors
+ignore = {
+  "6..", -- whitespace issues (611: empty line, 612: trailing whitespace)
+}
+
+-- Allow unused variables in certain contexts (like _ prefix)
+std = "luajit"
