@@ -70,8 +70,14 @@ jobs:
     - name: Install pre-commit
       run: pip install pre-commit
 
-    - name: Run pre-commit (stylua and luacheck)
-      run: pre-commit run --all-files stylua luacheck
+    - name: Install pre-commit hooks
+      run: pre-commit install-hooks
+
+    - name: Run stylua
+      run: pre-commit run stylua --all-files
+
+    - name: Run luacheck
+      run: pre-commit run luacheck --all-files
 
     - name: Run Lua tests
       run: |
