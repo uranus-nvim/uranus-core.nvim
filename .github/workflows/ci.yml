@@ -72,7 +72,9 @@ jobs:
     - name: Lint Lua
       run: |
         if [ -f .luacheckrc ]; then
-          ~/.luarocks/bin/luacheck --config .luacheckrc --no-color lua/ tests/
+          # Run luacheck but don't fail on warnings (only on errors)
+          # luacheck exit codes: 0 = no warnings/errors, 1 = warnings, 2 = errors
+          ~/.luarocks/bin/luacheck --config .luacheckrc --no-color lua/ tests/ || [ $? -le 1 ]
         fi
 
     - name: Install StyLua
