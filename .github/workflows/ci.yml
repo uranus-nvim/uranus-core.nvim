@@ -62,30 +62,16 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y neovim
 
-    - name: Install LuaRocks
-      run: |
-        sudo apt-get install -y luarocks
-
-    - name: Install luacheck
-      run: luarocks install --local luacheck
-
-    - name: Lint Lua
-      run: |
-        if [ -f .luacheckrc ]; then
-          # Run luacheck but don't fail on warnings (only on errors)
-          # luacheck exit codes: 0 = no warnings/errors, 1 = warnings, 2 = errors
-          ~/.luarocks/bin/luacheck --config .luacheckrc --no-color lua/ tests/ || [ $? -le 1 ]
-        fi
-
-    - name: Install StyLua
-      uses: JohnnyMorganz/stylua-action@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        version: latest
-        args: --version
+        python-version: '3.11'
 
-    - name: Check Lua formatting
-      run: stylua --check lua/ tests/
+    - name: Install pre-commit
+      run: pip install pre-commit
+
+    - name: Run pre-commit (stylua and luacheck)
+      run: pre-commit run --all-files stylua luacheck
 
     - name: Run Lua tests
       run: |
