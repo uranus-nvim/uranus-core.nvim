@@ -82,8 +82,9 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         version: latest
+        args: --version
 
-    - name: Check formatting
+    - name: Check Lua formatting
       run: stylua --check lua/ tests/
 
     - name: Run Lua tests
